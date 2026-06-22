@@ -181,7 +181,7 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
   const ai = new GoogleGenAI({ apiKey });
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.1-flash-lite',
     contents: `Extract structured data from this resume:\n\n${rawText}`,
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -313,7 +313,7 @@ export async function parseJobDescription(rawDescription: string): Promise<Parse
     .slice(0, 4_000);
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.1-flash-lite',
     contents: `Extract structured hiring requirements from this job description:\n\n${cleaned}`,
     config: {
       systemInstruction: JOB_SYSTEM_INSTRUCTION,
