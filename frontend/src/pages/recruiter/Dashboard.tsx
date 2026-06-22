@@ -173,11 +173,11 @@ export default function RecruiterDashboard() {
     <div className="space-y-8 animate-fade-in">
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="text-left border-b border-gray-200 pb-6">
-        <h1 className="text-3xl font-black text-gray-900">
+      <div className="text-left border-b border-slate-800 pb-6">
+        <h1 className="text-3xl font-black text-slate-100">
           Recruiter Dashboard
         </h1>
-        <p className="text-gray-500 mt-1 text-sm">
+        <p className="text-slate-400 mt-1 text-sm">
           Manage your job postings and review AI-scored applicants
         </p>
       </div>
@@ -199,32 +199,32 @@ export default function RecruiterDashboard() {
       </div>
 
       {/* ── Post job form ─────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <button
           onClick={() => setFormOpen((v) => !v)}
           className="w-full flex items-center justify-between px-6 py-5
-                     hover:bg-gray-50 transition-colors group"
+                     hover:bg-slate-950 transition-colors group"
         >
           <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-indigo-50 rounded-xl">
+            <div className="p-2.5 bg-indigo-500/10 rounded-xl">
               <PlusCircle size={20} className="text-indigo-600" />
             </div>
             <div className="text-left">
-              <p className="font-bold text-gray-900 text-base">Post a New Job</p>
-              <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 font-medium">
+              <p className="font-bold text-slate-100 text-base">Post a New Job</p>
+              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
                 <Sparkles size={12} className="text-emerald-600" />
                 AI will automatically extract required skills from your description
               </p>
             </div>
           </div>
           {formOpen
-            ? <ChevronUp size={20} className="text-gray-400" />
-            : <ChevronDown size={20} className="text-gray-400" />
+            ? <ChevronUp size={20} className="text-slate-500" />
+            : <ChevronDown size={20} className="text-slate-500" />
           }
         </button>
 
         {formOpen && (
-          <div className="px-6 pb-6 border-t border-gray-100 animate-slide-up bg-gray-50">
+          <div className="px-6 pb-6 border-t border-slate-800 animate-slide-up bg-slate-950">
             <form onSubmit={(e) => { void handlePost(e); }} className="space-y-5 pt-6">
               <FormField
                 label="Job Title"
@@ -234,7 +234,7 @@ export default function RecruiterDashboard() {
               />
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
                   Job Description
                 </label>
                 <textarea
@@ -243,8 +243,8 @@ export default function RecruiterDashboard() {
                   placeholder={`Describe the role, responsibilities, and requirements.\n\nExample:\nWe are looking for a React/Node.js developer with 1+ year of experience...\nRequired: React, TypeScript, MongoDB, REST APIs\nMin CGPA: 7.5`}
                   rows={6}
                   required
-                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3
-                             text-sm text-gray-900 placeholder-gray-400 resize-y
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
+                             text-sm text-slate-100 placeholder-gray-400 resize-y
                              focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40
                              transition-colors shadow-sm"
                 />
@@ -292,8 +292,8 @@ export default function RecruiterDashboard() {
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 bg-white
-                             hover:bg-gray-50 transition-colors text-sm font-semibold shadow-sm"
+                  className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 bg-slate-900
+                             hover:bg-slate-950 transition-colors text-sm font-semibold shadow-sm"
                 >
                   Cancel
                 </button>
@@ -304,9 +304,9 @@ export default function RecruiterDashboard() {
       </div>
 
       {/* ── Job listings ─────────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
             <Briefcase size={18} className="text-indigo-600" />
             {/* BUG FIX (Bug 1): Label now says "Your Postings" — data is scoped to this recruiter */}
             Your Postings ({jobs.length})
@@ -314,7 +314,7 @@ export default function RecruiterDashboard() {
           <button
             onClick={() => void fetchJobs()}
             disabled={loadingJobs}
-            className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
             aria-label="Refresh"
           >
             <RefreshCw size={16} className={loadingJobs ? 'animate-spin' : ''} />
@@ -324,13 +324,13 @@ export default function RecruiterDashboard() {
         {loadingJobs ? (
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-20 bg-gray-50 border border-gray-100 rounded-xl animate-pulse" />
+              <div key={i} className="h-20 bg-slate-950 border border-slate-800 rounded-xl animate-pulse" />
             ))}
           </div>
         ) : jobs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Briefcase size={48} className="mx-auto mb-4 text-gray-300" />
-            <p className="font-semibold text-gray-900 text-lg">No jobs posted yet</p>
+          <div className="text-center py-12 text-slate-400">
+            <Briefcase size={48} className="mx-auto mb-4 text-slate-600" />
+            <p className="font-semibold text-slate-100 text-lg">No jobs posted yet</p>
             <p className="text-sm mt-1">Click "Post a New Job" above to get started</p>
           </div>
         ) : (
@@ -338,22 +338,22 @@ export default function RecruiterDashboard() {
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all duration-300"
+                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all duration-300"
               >
                 {/* Job Header */}
                 <div className="p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 text-lg truncate">{job.title}</h3>
-                      <p className="text-sm text-gray-500 mt-1 font-medium">
+                      <h3 className="font-bold text-slate-100 text-lg truncate">{job.title}</h3>
+                      <p className="text-sm text-slate-400 mt-1 font-medium">
                         Posted {new Date(job.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <span className={cn(
                       'flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold border',
                       job.isActive
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-gray-100 text-gray-600 border-gray-200',
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : 'bg-slate-800 text-slate-400 border-slate-800',
                     )}>
                       {job.isActive ? 'Active' : 'Closed'}
                     </span>
@@ -361,20 +361,20 @@ export default function RecruiterDashboard() {
 
                   <div className="flex flex-wrap gap-2 mt-4">
                     {job.requiredSkills.slice(0, 5).map((s) => (
-                      <span key={s} className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-md">
+                      <span key={s} className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold rounded-md">
                         {s}
                       </span>
                     ))}
                     {job.requiredSkills.length > 5 && (
-                      <span className="text-gray-500 text-xs font-medium self-center px-1">
+                      <span className="text-slate-400 text-xs font-medium self-center px-1">
                         +{job.requiredSkills.length - 5} more
                       </span>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-6 mt-4 text-sm text-gray-600 border-t border-gray-100 pt-4">
-                    <span>CGPA ≥ <span className="font-bold text-gray-900">{job.minCgpa}</span></span>
-                    <span>Exp ≥ <span className="font-bold text-gray-900">{job.minExperience} yrs</span></span>
+                  <div className="flex flex-wrap gap-6 mt-4 text-sm text-slate-400 border-t border-slate-800 pt-4">
+                    <span>CGPA ≥ <span className="font-bold text-slate-100">{job.minCgpa}</span></span>
+                    <span>Exp ≥ <span className="font-bold text-slate-100">{job.minExperience} yrs</span></span>
 
                     {/* BUG FIX (Bug 5): Total Applicants from REAL _count.applications */}
                     <span className="font-semibold text-emerald-600">
@@ -385,7 +385,7 @@ export default function RecruiterDashboard() {
                       {/* BUG FIX (Bug 6): Delete button — already worked, now scoped correctly */}
                       <button
                         onClick={() => void handleDeleteJob(job.id)}
-                        className="flex items-center gap-1.5 text-red-500 font-semibold hover:text-red-700 transition-colors"
+                        className="flex items-center gap-1.5 text-red-500 font-semibold hover:text-red-400 transition-colors"
                       >
                         <Trash2 size={16} />
                         Delete
@@ -407,8 +407,8 @@ export default function RecruiterDashboard() {
                 {/* BUG FIX (Bug 3 + Bug 5): Replaced hardcoded mockApplicants        */}
                 {/* with real data fetched from GET /api/jobs/:jobId/applicants.        */}
                 {viewingApplicantsFor === job.id && (
-                  <div className="bg-gray-50 border-t border-gray-200 p-6 animate-slide-up">
-                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <div className="bg-slate-950 border-t border-slate-800 p-6 animate-slide-up">
+                    <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Search size={16} className="text-indigo-600" />
                       AI Ranked Applicants
                       {!loadingApplicants && (
@@ -419,14 +419,14 @@ export default function RecruiterDashboard() {
                     </h4>
 
                     {loadingApplicants ? (
-                      <div className="flex items-center justify-center py-8 gap-3 text-gray-500">
+                      <div className="flex items-center justify-center py-8 gap-3 text-slate-400">
                         <Loader2 size={20} className="animate-spin text-indigo-500" />
                         <span className="text-sm font-medium">Loading applicants…</span>
                       </div>
                     ) : applicants.length === 0 ? (
-                      <div className="text-center py-8 text-gray-400">
-                        <Users size={36} className="mx-auto mb-3 text-gray-300" />
-                        <p className="font-medium text-gray-500">No applications yet</p>
+                      <div className="text-center py-8 text-slate-500">
+                        <Users size={36} className="mx-auto mb-3 text-slate-600" />
+                        <p className="font-medium text-slate-400">No applications yet</p>
                         <p className="text-sm mt-1">Students will appear here once they apply</p>
                       </div>
                     ) : (
@@ -439,25 +439,25 @@ export default function RecruiterDashboard() {
                           return (
                             <div
                               key={applicant.id}
-                              className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between shadow-sm hover:border-indigo-200 transition-colors"
+                              className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex items-center justify-between shadow-sm hover:border-indigo-200 transition-colors"
                             >
                               <div className="flex items-center gap-5">
                                 <div className="flex-shrink-0">
                                   <CircularProgress score={score} size={56} stroke={5} />
                                 </div>
                                 <div>
-                                  <p className="font-bold text-gray-900">{name}</p>
-                                  <p className="text-sm text-gray-500">
+                                  <p className="font-bold text-slate-100">{name}</p>
+                                  <p className="text-sm text-slate-400">
                                     {applicant.student.college} · {applicant.student.cgpa} CGPA
                                   </p>
                                   {/* Status badge */}
                                   <span className={cn(
                                     'inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-semibold',
                                     applicant.status === 'PENDING'
-                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                       : applicant.status === 'SHORTLISTED'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-red-50 text-red-700 border border-red-200',
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-red-500/10 text-red-400 border border-red-500/20',
                                   )}>
                                     {applicant.status}
                                   </span>
@@ -471,21 +471,21 @@ export default function RecruiterDashboard() {
                                     href={applicant.student.resumeUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
                                   >
                                     <FileText size={14} />
                                     Resume
                                     <ExternalLink size={12} />
                                   </a>
                                 ) : (
-                                  <span className="px-4 py-2 bg-gray-50 text-gray-400 text-sm rounded-lg border border-gray-200">
+                                  <span className="px-4 py-2 bg-slate-950 text-slate-500 text-sm rounded-lg border border-slate-800">
                                     No Resume
                                   </span>
                                 )}
                                 {/* Contact via email */}
                                 <a
                                   href={`mailto:${applicant.student.user.email}`}
-                                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                  className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors"
                                   title={`Email ${applicant.student.user.email}`}
                                 >
                                   <Mail size={18} />
@@ -514,13 +514,13 @@ function StatCard({
   label: string; value: number; icon: React.ReactNode; sub: string;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-gray-600 text-sm font-semibold">{label}</span>
-        <div className="p-2.5 bg-gray-50 rounded-xl">{icon}</div>
+        <span className="text-slate-400 text-sm font-semibold">{label}</span>
+        <div className="p-2.5 bg-slate-950 rounded-xl">{icon}</div>
       </div>
-      <p className="text-4xl font-black text-gray-900">{value}</p>
-      <p className="text-gray-500 text-xs mt-2 font-medium">{sub}</p>
+      <p className="text-4xl font-black text-slate-100">{value}</p>
+      <p className="text-slate-400 text-xs mt-2 font-medium">{sub}</p>
     </div>
   );
 }
@@ -533,7 +533,7 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+      <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
         {label}
       </label>
       <input
@@ -544,8 +544,8 @@ function FormField({
         step={step}
         min={min}
         max={max}
-        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3
-                   text-sm text-gray-900 placeholder-gray-400
+        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
+                   text-sm text-slate-100 placeholder-gray-400
                    focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40
                    transition-colors shadow-sm"
       />

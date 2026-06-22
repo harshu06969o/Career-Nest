@@ -109,10 +109,9 @@ export function calculateMatchScore(
       jobSkillSet.has(s),
     ).length;
 
-    // Union = all unique skills across both sets
-    const unionSize = new Set([...studentSkillSet, ...jobSkillSet]).size;
-
-    jaccardScore = unionSize === 0 ? 0 : intersectionSize / unionSize;
+    // We shouldn't penalize students for having MORE skills than required.
+    // Instead of Jaccard (Intersection / Union), we use Recall (Intersection / Required).
+    jaccardScore = intersectionSize / jobSkillSet.size;
   }
 
   // ── 4. Weighted Total ────────────────────────────────────────────────────

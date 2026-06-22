@@ -214,6 +214,8 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
         resumeUrl,
         parsedSkills: parsedData.skills,
         experienceYears: parsedData.experienceYears,
+        cgpa: parsedData.cgpa,
+        college: parsedData.college !== "" ? parsedData.college : undefined,
       },
     });
 
@@ -244,6 +246,8 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
       parsedSkills: parsedData.skills,
       experienceYears: parsedData.experienceYears,
       projects: parsedData.projects,
+      cgpa: parsedData.cgpa,
+      college: parsedData.college,
     },
   });
 };

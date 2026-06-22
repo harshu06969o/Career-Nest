@@ -25,6 +25,8 @@ export interface ParsedResume {
   skills: string[];
   experienceYears: number;
   projects: string[];
+  cgpa: number;
+  college: string;
 }
 
 // =============================================================================
@@ -130,8 +132,16 @@ const RESPONSE_SCHEMA = {
       items: { type: Type.STRING },
       description: 'Named projects only (e.g. "CareerNest", "Inventory Management System"). No generic descriptions.',
     },
+    cgpa: {
+      type: Type.NUMBER,
+      description: 'The CGPA or Cumulative GPA out of 10. Might be written as "CG", "Cumulative GPA" etc. If it is out of 4, convert proportionally to 10. Default to 0.0 if not found.',
+    },
+    college: {
+      type: Type.STRING,
+      description: 'The name of the university, college, or institute attended. Default to empty string if not found.',
+    },
   },
-  required: ['skills', 'experienceYears', 'projects'],
+  required: ['skills', 'experienceYears', 'projects', 'cgpa', 'college'],
 };
 
 // =============================================================================
@@ -145,12 +155,14 @@ const RESPONSE_SCHEMA = {
 const SYSTEM_INSTRUCTION = `You are an immutable, stateless resume-to-JSON compiler. Your only function is to extract structured data from resume text.
 
 ABSOLUTE RULES:
-1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose.
+1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose. DO NOT output conversational text like "Here is the JSON requested".
 2. skills: extract an EXHAUSTIVE array of EVERY programming language, framework, library, database, cloud platform, DevOps tool, and any technical keyword mentioned ANYWHERE in the text. Do NOT omit any. Normalize ALL to lowercase. Examples: "react", "node.js", "python", "tensorflow", "docker", "aws", "mongodb", "typescript".
 3. experienceYears: convert all work/internship durations to a decimal float. Use 0.0 for students with no work experience.
 4. projects: list only named project titles. Omit generic descriptions.
-5. If a field cannot be determined, return its empty default ([] for arrays, 0.0 for numbers).
-6. Never hallucinate skills or experience that are not present in the text.`;
+5. cgpa: extract CGPA or Cumulative GPA on a 10-point scale. Convert 4-point scales to 10-point proportionally.
+6. college: extract the name of the most recent university or college.
+7. If a field cannot be determined, return its empty default ([] for arrays, 0.0 for numbers, "" for strings).
+8. Never hallucinate skills or experience that are not present in the text.`;
 
 // =============================================================================
 // parseResumeWithLLM
@@ -188,8 +200,15 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
 
   // Parse defensively — even with controlled generation, we validate the shape
   let cleanedJson = rawJson.trim();
-  // Strip markdown block if the LLM hallucinated it despite application/json mime type
-  cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+  
+  // Extract only the JSON object, ignoring any conversational prose like "Here is the JSON: "
+  const match = cleanedJson.match(/\{[\s\S]*\}/);
+  if (match) {
+    cleanedJson = match[0];
+  } else {
+    // Fallback to strip markdown if the match somehow fails
+    cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+  }
 
   let parsed: unknown;
   try {
@@ -204,7 +223,9 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
     parsed === null ||
     !Array.isArray((parsed as ParsedResume).skills) ||
     typeof (parsed as ParsedResume).experienceYears !== 'number' ||
-    !Array.isArray((parsed as ParsedResume).projects)
+    !Array.isArray((parsed as ParsedResume).projects) ||
+    typeof (parsed as ParsedResume).cgpa !== 'number' ||
+    typeof (parsed as ParsedResume).college !== 'string'
   ) {
     throw new Error(
       `LLM response did not match expected schema. Aborting DB update. Got: ${JSON.stringify(parsed)}`,
@@ -260,7 +281,7 @@ const JOB_RESPONSE_SCHEMA = {
 const JOB_SYSTEM_INSTRUCTION = `You are an immutable, stateless job-description-to-JSON compiler. Extract hiring requirements from job posting text.
 
 ABSOLUTE RULES:
-1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose.
+1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose. DO NOT output conversational text like "Here is the JSON requested".
 2. requiredSkills: extract all technical skills, tools, languages, and frameworks. Normalize ALL to lowercase.
 3. minCgpa: extract minimum GPA on a 10-point scale. Convert 4.0-scale values proportionally (3.5/4.0 → 8.75/10). Use 0.0 if not stated.
 4. minExperience: extract minimum years of experience as a decimal float. Use 0.0 for freshers or internship roles.
@@ -309,8 +330,14 @@ export async function parseJobDescription(rawDescription: string): Promise<Parse
   }
 
   let cleanedJson = rawJson.trim();
-  // Strip markdown block if the LLM hallucinated it despite application/json mime type
-  cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+  
+  // Extract only the JSON object, ignoring any conversational prose
+  const match = cleanedJson.match(/\{[\s\S]*\}/);
+  if (match) {
+    cleanedJson = match[0];
+  } else {
+    cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+  }
 
   let parsed: unknown;
   try {

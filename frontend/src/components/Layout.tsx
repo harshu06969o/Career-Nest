@@ -129,7 +129,7 @@ export default function Layout() {
 
           {/* Mobile: hamburger */}
           <button
-            className="md:hidden p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+            className="md:hidden p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Toggle menu"
           >
