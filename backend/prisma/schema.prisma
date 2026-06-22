@@ -1,0 +1,226 @@
+// =============================================================================
+// CareerNest - Prisma Schema for MongoDB
+// =============================================================================
+// Design Rationale:
+//   - MongoDB uses BSON ObjectIds for _id. We map all Prisma `id` fields to
+//     the `_id` field using @map("_id") and @db.ObjectId to stay aligned with
+//     MongoDB's native identity strategy.
+//   - Prisma with MongoDB does NOT support `@unique` compound indexes via
+//     @@unique in the same way relational DBs do. Compound unique indexes are
+//     declared with @@index and enforced at the DB level. Application-level
+//     duplicate checks are added in the controller as a belt-and-suspenders
+//     strategy (see Application model notes below).
+//   - `parsedSkills` and `requiredSkills` are stored as String arrays. For
+//     complex matching algorithms (e.g. cosine similarity, set intersection),
+//     we will later store vector embeddings in a separate collection or use
+//     MongoDB Atlas Vector Search. The raw string arrays serve as a fast,
+//     readable fallback for rule-based matching.
+// =============================================================================
+
+generator client {
+  provider   = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum Role {
+  STUDENT
+  RECRUITER
+  ADMIN
+}
+
+enum ApplicationStatus {
+  PENDING
+  SHORTLISTED
+  REJECTED
+}
+
+// =============================================================================
+// USER MODEL
+// =============================================================================
+// The central auth identity. Role determines which profile relation is active.
+// We avoid storing any PII beyond email in this model; all profile data lives
+// in StudentProfile / RecruiterProfile to keep auth lookups lean and fast.
+// =============================================================================
+model User {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(STUDENT)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations - only one of these will be populated depending on `role`
+  studentProfile   StudentProfile?
+  recruiterProfile RecruiterProfile?
+
+  // A recruiter user can post many jobs
+  postedJobs Job[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// STUDENT PROFILE MODEL
+// =============================================================================
+// One-to-one with User. Holds all academic and skills data needed for the
+// matching engine.
+//
+// `parsedSkills` - populated by the resume parsing service (LLM / NLP pipeline).
+//   Stored as normalized lowercase strings for consistent set-intersection
+//   matching against Job.requiredSkills (e.g., "react", "node.js", "python").
+//
+// `resumeUrl` - object storage URL (e.g., AWS S3 / Cloudinary). Optional
+//   until the student uploads their resume.
+//
+// `cgpa` and `experienceYears` - used for hard-filter eligibility checks
+//   BEFORE the expensive AI matching step, reducing unnecessary LLM calls.
+// =============================================================================
+model StudentProfile {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+  firstName       String
+  lastName        String
+  college         String
+  resumeUrl       String?  // Optional until resume is uploaded
+  
+  // Populated by the resume parsing service. Normalized lowercase strings.
+  parsedSkills    String[]
+  
+  // Hard-filter fields: checked before AI matching to save LLM quota
+  cgpa            Float
+  experienceYears Float    @default(0)
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@map("student_profiles")
+}
+
+// =============================================================================
+// RECRUITER PROFILE MODEL
+// =============================================================================
+// One-to-one with User. Minimal model — company context lives here while
+// the recruiter's job postings are accessed via the User relation.
+// =============================================================================
+model RecruiterProfile {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String @unique @db.ObjectId
+  companyName String
+  designation String
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recruiter_profiles")
+}
+
+// =============================================================================
+// JOB MODEL
+// =============================================================================
+// One-to-many with User (the posting Recruiter).
+//
+// `requiredSkills` - normalized lowercase strings, mirroring StudentProfile.
+//   The matching engine computes a Jaccard similarity (|A ∩ B| / |A ∪ B|)
+//   between this array and a student's `parsedSkills` as a fast pre-score
+//   before calling the LLM for semantic re-ranking.
+//
+// `minCgpa` and `minExperience` - used as hard cutoffs in the eligibility
+//   controller. Students below these thresholds are filtered out without
+//   touching the AI layer, directly protecting our free-tier LLM quota.
+//
+// Index on `recruiterId`: Critical for the /jobs/my-postings endpoint which
+//   fetches all jobs for a given recruiter. Without this, MongoDB performs a
+//   full collection scan on every recruiter dashboard load.
+//
+// Index on `isActive`: Used to efficiently filter active listings on the
+//   student-facing job feed — the single highest-traffic query in the system.
+// =============================================================================
+model Job {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId     String   @db.ObjectId
+  title           String
+  description     String
+  
+  // Normalized lowercase skill strings for fast set-intersection pre-scoring
+  requiredSkills  String[]
+  
+  // Hard eligibility cutoffs — checked before AI to protect LLM quota
+  minCgpa         Float    @default(0)
+  minExperience   Float    @default(0)
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  recruiter    User          @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  // Index for fast recruiter dashboard queries (/api/jobs/my-postings)
+  // Index on isActive for fast student-facing job feed queries
+  @@index([recruiterId])
+  @@index([isActive])
+
+  @@map("jobs")
+}
+
+// =============================================================================
+// APPLICATION MODEL
+// =============================================================================
+// Many-to-one with both StudentProfile and Job.
+//
+// `matchScore` - a Float (0.0 to 1.0) populated by the AI/Vector matching
+//   service after the application is submitted. Stored here to avoid
+//   re-computing it on every dashboard load (critical for free-tier quota).
+//   The recruiter dashboard sorts candidates by this score descending.
+//
+// `status` - managed by the recruiter. Drives notification emails to the student.
+//
+// COMPOUND UNIQUE CONSTRAINT NOTE:
+//   MongoDB in Prisma supports @@index for compound indexes but @@unique on
+//   arrays of ObjectIds has limitations in the current Prisma MongoDB driver.
+//   Strategy: We declare @@index([studentId, jobId]) for query performance, AND
+//   enforce uniqueness at the controller level:
+//     const existing = await prisma.application.findFirst({ where: { studentId, jobId } });
+//     if (existing) throw new ConflictError("Already applied to this job");
+//   This belt-and-suspenders approach is the recommended pattern for Prisma + MongoDB.
+//
+// Index on `[studentId, jobId]`: Serves double duty — speeds up the uniqueness
+//   check in the controller and powers the student's "My Applications" dashboard.
+//
+// Index on `jobId`: Allows the recruiter to list all applicants for a specific
+//   job without scanning the entire applications collection.
+// =============================================================================
+model Application {
+  id         String            @id @default(auto()) @map("_id") @db.ObjectId
+  studentId  String            @db.ObjectId
+  jobId      String            @db.ObjectId
+  
+  // AI/Vector match score (0.0 - 1.0). Persisted to avoid recomputation.
+  // Null until the async matching job completes after application submission.
+  matchScore Float?
+  
+  status     ApplicationStatus @default(PENDING)
+  appliedAt  DateTime          @default(now())
+
+  // Relations
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  job     Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Compound index: powers uniqueness checks and "My Applications" queries.
+  // Uniqueness is enforced in controller logic (see comment above).
+  @@index([studentId, jobId])
+  
+  // Powers recruiter's "View Applicants" query sorted by matchScore
+  @@index([jobId])
+
+  @@map("applications")
+}

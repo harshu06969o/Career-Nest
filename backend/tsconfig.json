@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    // --- Output ---
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // --- Module System ---
+    // "nodenext" resolves modules the same way Node.js does at runtime.
+    // It requires ESM-style imports and respects the "type" field in package.json.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+
+    // --- Type Definitions ---
+    // Explicitly list only what we need — keeps the type environment clean.
+    "lib": ["es2022"],
+    "types": ["node"],
+
+    // --- Output Helpers ---
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // --- Strict Type Checking ---
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // --- Module Integrity ---
+    // verbatimModuleSyntax: Forces your import syntax to match the actual
+    // runtime module system. Prevents silent CJS/ESM mismatches. Keep this ON.
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // --- DX ---
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
