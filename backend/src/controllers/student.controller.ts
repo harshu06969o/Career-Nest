@@ -215,7 +215,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
         parsedSkills: parsedData.skills,
         experienceYears: parsedData.experienceYears,
         cgpa: parsedData.cgpa,
-        college: parsedData.college !== "" ? parsedData.college : undefined,
+        ...(parsedData.college !== "" && { college: parsedData.college }),
       },
     });
 

@@ -320,7 +320,7 @@ export async function parseJobDescription(rawDescription: string): Promise<Parse
       responseMimeType: 'application/json',
       responseSchema: JOB_RESPONSE_SCHEMA,
       temperature: 0,
-      maxOutputTokens: 256, // Schema is tiny — strict ceiling to prevent verbose output
+      maxOutputTokens: 1024, // Increased to prevent incomplete JSON if the LLM adds prose before the JSON block
     },
   });
 
