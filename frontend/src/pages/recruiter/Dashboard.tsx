@@ -45,9 +45,16 @@ interface RealApplicant {
   };
 }
 
-// =============================================================================
-// Recruiter Dashboard
-// =============================================================================
+/**
+ * Recruiter Dashboard Component.
+ * Primary interface for recruiters to post new jobs, manage existing active listings,
+ * and review algorithmic candidate matches.
+ * 
+ * @architecture
+ * Client-Side Filtering: The dashboard fetches only the active jobs belonging to the 
+ * authenticated recruiter. "View Applicants" triggers a lazy, on-demand fetch to 
+ * avoid loading heavy applicant datasets for jobs the user isn't currently inspecting.
+ */
 export default function RecruiterDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -59,16 +66,13 @@ export default function RecruiterDashboard() {
   const [applicants, setApplicants] = useState<RealApplicant[]>([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
 
-  // Form state
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [minCgpa, setMinCgpa] = useState('');
   const [minExp, setMinExp] = useState('');
 
-  // ── Fetch jobs ─────────────────────────────────────────────────────────────
-  // BUG FIX (Bug 1): Changed from '/jobs' to '/jobs/my-postings'.
-  // The original '/jobs' (getAllJobs) returns ALL active jobs from every recruiter.
-  // '/jobs/my-postings' strictly filters by `recruiterId: req.user.userId`.
+
   const fetchJobs = useCallback(async () => {
     setLoadingJobs(true);
     try {
@@ -83,7 +87,7 @@ export default function RecruiterDashboard() {
 
   useEffect(() => { void fetchJobs(); }, [fetchJobs]);
 
-  // ── Post new job ───────────────────────────────────────────────────────────
+
   const handlePost = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
@@ -96,9 +100,7 @@ export default function RecruiterDashboard() {
       await api.post('/jobs', {
         title: title.trim(),
         description: description.trim(),
-        // BUG FIX (Bug 2): parseFloat() ensures HTML input strings like '7.5'
-        // are correctly typed as Floats. `|| undefined` sends nothing (not 0)
-        // when the field is left blank, so the backend falls back to LLM parsing.
+        // Send empty strings as undefined so the backend defaults to LLM extraction
         minCgpa:      minCgpa.trim()  ? parseFloat(minCgpa)  : undefined,
         minExperience: minExp.trim()  ? parseFloat(minExp)   : undefined,
       });
@@ -114,16 +116,14 @@ export default function RecruiterDashboard() {
     }
   };
 
-  // ── Delete job ─────────────────────────────────────────────────────────────
-  // BUG FIX (Bug 6): Already implemented — now properly scoped to recruiter's
-  // own jobs because fetchJobs now calls /my-postings (Bug 1 fix).
+
   const handleDeleteJob = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this job posting? This cannot be undone.')) return;
 
     try {
       await api.delete(`/jobs/${id}`);
       toast.success('Job successfully deleted.');
-      // Optimistic local state update — no full refetch needed
+      // Optimistically update the UI to avoid a full refetch
       setJobs((prev) => prev.filter((j) => j.id !== id));
       if (viewingApplicantsFor === id) {
         setViewingApplicantsFor(null);
@@ -134,12 +134,9 @@ export default function RecruiterDashboard() {
     }
   };
 
-  // ── Fetch real applicants ──────────────────────────────────────────────────
-  // BUG FIX (Bug 3 + Bug 5): Replace the hardcoded mockApplicants array with
-  // a real API call to GET /api/jobs/:jobId/applicants.
-  // The backend verifies job ownership before returning any data.
+
   const handleViewApplicants = async (jobId: string) => {
-    // Toggle: clicking the same job closes the panel
+    // Toggle visibility if clicking the same job
     if (viewingApplicantsFor === jobId) {
       setViewingApplicantsFor(null);
       setApplicants([]);
@@ -163,9 +160,7 @@ export default function RecruiterDashboard() {
     }
   };
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  // BUG FIX (Bug 5): totalApps is computed from the REAL _count.applications
-  // returned by getMyJobs. This now reflects only this recruiter's jobs.
+
   const totalApps = jobs.reduce((s, j) => s + (j._count?.applications ?? 0), 0);
   const activeJobs = jobs.filter((j) => j.isActive).length;
 
@@ -188,7 +183,7 @@ export default function RecruiterDashboard() {
           label="Your Open Positions"
           value={activeJobs}
           icon={<Briefcase size={20} className="text-indigo-600" />}
-          sub="Your active listings only"  // BUG FIX note: now scoped to this recruiter
+          sub="Your active listings only"
         />
         <StatCard
           label="Total Applications Received"
@@ -251,7 +246,7 @@ export default function RecruiterDashboard() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* BUG FIX (Bug 2): step="0.1" ensures numeric input is float-compatible */}
+                {/* Conditional Float Input Parsing */}
                 <FormField
                   label="Min CGPA (optional — leave blank for AI to decide)"
                   value={minCgpa}
@@ -308,7 +303,6 @@ export default function RecruiterDashboard() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
             <Briefcase size={18} className="text-indigo-600" />
-            {/* BUG FIX (Bug 1): Label now says "Your Postings" — data is scoped to this recruiter */}
             Your Postings ({jobs.length})
           </h2>
           <button
@@ -376,13 +370,13 @@ export default function RecruiterDashboard() {
                     <span>CGPA ≥ <span className="font-bold text-slate-100">{job.minCgpa}</span></span>
                     <span>Exp ≥ <span className="font-bold text-slate-100">{job.minExperience} yrs</span></span>
 
-                    {/* BUG FIX (Bug 5): Total Applicants from REAL _count.applications */}
+
                     <span className="font-semibold text-emerald-600">
                       Total Applicants: {job._count?.applications ?? 0}
                     </span>
 
                     <div className="ml-auto flex items-center gap-4">
-                      {/* BUG FIX (Bug 6): Delete button — already worked, now scoped correctly */}
+
                       <button
                         onClick={() => void handleDeleteJob(job.id)}
                         className="flex items-center gap-1.5 text-red-500 font-semibold hover:text-red-400 transition-colors"
@@ -391,7 +385,7 @@ export default function RecruiterDashboard() {
                         Delete
                       </button>
 
-                      {/* BUG FIX (Bug 3 + Bug 5): "View Applicants" now calls real API */}
+
                       <button
                         onClick={() => void handleViewApplicants(job.id)}
                         className="flex items-center gap-1.5 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
@@ -404,8 +398,7 @@ export default function RecruiterDashboard() {
                 </div>
 
                 {/* ── Real Applicants Panel ─────────────────────────────────── */}
-                {/* BUG FIX (Bug 3 + Bug 5): Replaced hardcoded mockApplicants        */}
-                {/* with real data fetched from GET /api/jobs/:jobId/applicants.        */}
+                {/* Lazy-loaded Applicants List */}
                 {viewingApplicantsFor === job.id && (
                   <div className="bg-slate-950 border-t border-slate-800 p-6 animate-slide-up">
                     <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider mb-4 flex items-center gap-2">

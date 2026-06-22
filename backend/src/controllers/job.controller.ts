@@ -84,20 +84,17 @@ async function safeRedisDel(key: string): Promise<void> {
   }
 }
 
-// =============================================================================
-// createJob
-// =============================================================================
-// Pipeline:
-//  1. Validate body → 400
-//  2. Parse description with LLM (ONE-TIME cost) → structured criteria
-//  3. Atomic Prisma write → MongoDB
-//  4. Cache individual job at job:${id}
-//  5. Invalidate jobs:all so the next GET rebuilds a fresh list
-//  6. Return 201
-//
-// Token contract: parseJobDescription is called exactly ONCE per job.
-// Every subsequent read hits Redis in O(1) — zero LLM calls, zero DB queries.
-// =============================================================================
+/**
+ * Creates a new job posting and extracts structured hiring criteria via LLM.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ *
+ * @architecture
+ * Zero-Token Recurring Cost Strategy: The job description is parsed by the LLM exactly once 
+ * during creation. The extracted schema (skills, CGPA, experience) is persisted to MongoDB. 
+ * All subsequent matching queries execute locally in O(1) time without triggering external APIs.
+ */
 export const createJob = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -190,18 +187,17 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
-// =============================================================================
-// getAllJobs
-// =============================================================================
-// Cache-first read strategy:
-//
-//   Redis HIT  → return immediately (0 DB queries, 0 LLM calls, O(1) latency)
-//   Redis MISS → query MongoDB, prime cache, return data
-//   Redis DOWN → gracefully fall through to MongoDB (no crash)
-//
-// The `source` field in the response tells the caller (and developers)
-// whether the data came from cache or the database — useful for debugging.
-// =============================================================================
+/**
+ * Retrieves all active job postings for the global feed.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ *
+ * @architecture
+ * Cache-first read strategy utilizing Redis. If a cache miss occurs, data is fetched 
+ * from MongoDB, cached, and returned. Graceful degradation ensures that if the Redis 
+ * layer is unavailable, queries safely fall through directly to MongoDB.
+ */
 export const getAllJobs = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -258,19 +254,12 @@ export const getAllJobs = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// =============================================================================
-// getMyJobs
-// =============================================================================
-// GET /api/jobs/my-postings
-//
-// BUG FIX (Bug 1 — Cross-User Data Leakage): The original `getAllJobs` had
-// NO recruiter filter — it returned every active job to every role.
-// This endpoint strictly scopes the DB query to `recruiterId: req.user.userId`.
-// A recruiter can NEVER see another recruiter's jobs through this endpoint.
-//
-// Includes application counts AND populated student details for the
-// "View Applicants" feature (Bug 5 fix).
-// =============================================================================
+/**
+ * Retrieves job postings created by the authenticated recruiter.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ */
 export const getMyJobs = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -305,18 +294,17 @@ export const getMyJobs = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// =============================================================================
-// getJobApplicants
-// =============================================================================
-// GET /api/jobs/:jobId/applicants
-//
-// BUG FIX (Bug 3 + Bug 5): The recruiter "View Applicants" panel was showing
-// hardcoded mock data because this endpoint didn't exist. This endpoint:
-//   1. Verifies the job belongs to the requesting recruiter (authorization)
-//   2. Fetches all real Application records for that job
-//   3. Joins student profile data (name, college, cgpa, skills, resume)
-//   4. Sorts by matchScore descending (best candidates first)
-// =============================================================================
+/**
+ * Retrieves a ranked list of student applicants for a specific job posting.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ * 
+ * @architecture
+ * Data Isolation: Strictly enforces that only the job owner (recruiter) or an Admin 
+ * can view the applicants. Candidates are returned pre-sorted by their algorithmic 
+ * matchScore descending.
+ */
 export const getJobApplicants = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -389,12 +377,12 @@ export const getJobApplicants = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// =============================================================================
-// deleteJob
-// =============================================================================
-// Deletes a specific job posting. Protected to the Recruiter who posted it,
-// or an Admin.
-// =============================================================================
+/**
+ * Deletes a specific job posting and invalidates relevant caches.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ */
 export const deleteJob = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });

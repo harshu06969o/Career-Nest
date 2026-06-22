@@ -38,9 +38,13 @@ interface MatchedJob {
   };
 }
 
-// =============================================================================
-// Zero-Token Skill Gap Utility
-// =============================================================================
+/**
+ * Performs a zero-token local computation to determine the skill gap.
+ * 
+ * @param {string[]} required - Array of skills required by the job.
+ * @param {string[]} studentSkills - Array of skills extracted from the student's resume.
+ * @returns {{ matched: string[], missing: string[] }} The intersection and difference of the two sets.
+ */
 function analyzeSkillGap(required: string[], studentSkills: string[]) {
   const studentSkillsLower = studentSkills.map(s => s.toLowerCase());
   const matched: string[] = [];
@@ -57,9 +61,11 @@ function analyzeSkillGap(required: string[], studentSkills: string[]) {
   return { matched, missing };
 }
 
-// =============================================================================
-// Student Dashboard
-// =============================================================================
+/**
+ * Student Dashboard Component.
+ * Acts as the primary interface for students to upload resumes, view their profile, 
+ * and browse AI-matched job opportunities.
+ */
 export default function StudentDashboard() {
   const { user } = useAuthStore();
 
@@ -73,7 +79,7 @@ export default function StudentDashboard() {
   const [dragOver,   setDragOver]   = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Fetch profile ──────────────────────────────────────────────────────────
+
   const fetchProfile = useCallback(async () => {
     try {
       const { data } = await api.get<{ data: StudentProfile }>('/student/profile');
@@ -85,7 +91,7 @@ export default function StudentDashboard() {
     }
   }, []);
 
-  // ── Fetch matches ──────────────────────────────────────────────────────────
+
   const fetchMatches = useCallback(async () => {
     setLoadingMatches(true);
     try {
@@ -103,7 +109,7 @@ export default function StudentDashboard() {
     void fetchMatches();
   }, [fetchProfile, fetchMatches]);
 
-  // ── Resume upload ──────────────────────────────────────────────────────────
+
   const handleUpload = async (file: File) => {
     if (file.type !== 'application/pdf') {
       toast.error('Please upload a PDF file.');
@@ -132,7 +138,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // ── Apply to job ───────────────────────────────────────────────────────────
+
   const handleApply = async (jobId: string, jobTitle: string) => {
     setApplying(jobId);
     try {
@@ -140,10 +146,7 @@ export default function StudentDashboard() {
         `/eligibility/apply/${jobId}`,
       );
       toast.success(`Successfully applied to "${jobTitle}"! 🎉`);
-      // FIXED (Issue 4): Instead of refetching the API and causing UI jumpiness, 
-      // we maintain an appliedJobs set in local state to immediately show 'Applied'.
-      setAppliedJobs(prev => new Set(prev).add(jobId)); // Add to local state
-      // We don't refetch all matches to save UI jumpiness, relying on local state
+      setAppliedJobs(prev => new Set(prev).add(jobId));
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -154,7 +157,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // ── Stat cards ─────────────────────────────────────────────────────────────
+
   const stats = [
     {
       label:   'Skills Parsed',

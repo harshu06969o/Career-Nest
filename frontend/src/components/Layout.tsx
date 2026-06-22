@@ -8,9 +8,11 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/cn';
 
-// =============================================================================
-// Layout — global shell for all pages
-// =============================================================================
+/**
+ * Global application shell component.
+ * Provides the top navigation bar, responsive drawer, toast notifications, and 
+ * role-based dynamic routing links (Student vs Recruiter vs Admin).
+ */
 
 interface NavLink {
   label: string;

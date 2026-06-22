@@ -1,16 +1,7 @@
-// =============================================================================
-// Hybrid AI Matching Engine — Pure Local Computation
-// =============================================================================
-// Zero external API calls. Zero LLM tokens. Runs in-process on pre-parsed
-// structured data (skills arrays, CGPA, experience) that already live in
-// our MongoDB records.
-//
-// Algorithm breakdown:
-//   30% — Hard Filters  (CGPA: 15%, Experience: 15%)
-//   70% — Jaccard Skill Similarity
-//
-// Output: integer 0–100 (match percentage)
-// =============================================================================
+/**
+ * Hybrid AI Matching Engine — Pure Local Computation.
+ * Evaluates candidates against job requirements using a weighted algorithmic scoring model.
+ */
 
 // =============================================================================
 // Input Contracts
@@ -40,47 +31,33 @@ const WEIGHTS = {
 // Exported so the controller and any future UI config can reference it.
 export const APPLY_THRESHOLD = 50;
 
-// =============================================================================
-// calculateMatchScore
-// =============================================================================
-// Pure function — no I/O, no side effects, deterministic.
-// Safe to call in a tight loop for the getStudentMatches endpoint
-// (one call per job in the active listing, ~µs per evaluation).
-// =============================================================================
+/**
+ * Calculates a match score between a candidate's profile and a job's requirements.
+ *
+ * @param {StudentMatchInput} student - The parsed profile metrics of the candidate.
+ * @param {JobMatchInput} job - The structured hiring requirements.
+ * @returns {number} An integer representing the match percentage (0–100).
+ *
+ * @architecture
+ * O(1) Algorithmic Efficiency: Executes in-process using pre-parsed DB payloads. No I/O 
+ * or side effects, making it deterministic and safe for high-frequency tight-loop execution.
+ */
 export function calculateMatchScore(
   student: StudentMatchInput,
   job: JobMatchInput,
 ): number {
 
   // ── 1. CGPA Score (0 or 1, binary) ──────────────────────────────────────
-  // Binary because universities grade at different scales — a partial
-  // credit model rewards gaming (rounding up). Binary is honest.
-  // Edge case: minCgpa === 0 means no CGPA requirement → full credit.
   const cgpaScore =
     job.minCgpa === 0 || student.cgpa >= job.minCgpa ? 1.0 : 0.0;
 
   // ── 2. Experience Score (0→1, proportional, capped at 1.0) ──────────────
-  // Proportional rather than binary because 1.8 years vs 2.0 years required
-  // should score better than 0.5 years. Capped at 1.0 — extra experience
-  // doesn't inflate the score beyond its allotted weight.
-  // Edge case: minExperience === 0 → no requirement → full credit.
   const expScore =
     job.minExperience === 0
       ? 1.0
       : Math.min(student.experienceYears / job.minExperience, 1.0);
 
   // ── 3. Jaccard Skill Similarity (0→1, continuous) ───────────────────────
-  // Jaccard Index = |Intersection| / |Union|
-  //
-  // Why Jaccard over cosine similarity?
-  //   - Our skill vectors are boolean sets (a skill is present or absent),
-  //     not weighted frequency vectors. Jaccard is designed for set data.
-  //   - No embedding model needed → zero API calls, zero latency overhead.
-  //   - Naturally penalises both false positives AND false negatives.
-  //
-  // Normalisation: lowercase + trim applied to both sides so "React",
-  // "react", "react " all resolve to "react" — matching is skill-identity
-  // based, not string-literal based.
   const studentSkillSet = new Set(
     student.parsedSkills
       .map((s) => s.toLowerCase().trim())

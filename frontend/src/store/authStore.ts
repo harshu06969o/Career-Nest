@@ -21,12 +21,11 @@ interface AuthState {
   logout:   () => void;
 }
 
-// =============================================================================
-// Zustand Auth Store
-// =============================================================================
-// Persisted to localStorage so the user stays logged in across page refreshes.
-// Hydration is automatic — Zustand persist middleware handles it transparently.
-// =============================================================================
+/**
+ * Global Zustand Authentication Store.
+ * Manages the client-side session state (JWT token and user metadata) and persists
+ * it to localStorage. Hydration is handled automatically by the persist middleware.
+ */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -37,11 +36,10 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, user) => set({ token, user, isAuth: true }),
 
       logout: () => {
-        // BUG FIX (Issue 1 — Stale Token Leakage):
-        // Explicitly remove the persisted store key from localStorage FIRST.
-        // Calling set({...null}) only updates in-memory Zustand state; the persist
-        // middleware may not flush the removal synchronously, leaving a stale JWT
-        // accessible to the next user on a shared browser session.
+        // @architecture
+        // Cache Invalidation Strategy: Explicitly removes the persisted store key from 
+        // localStorage prior to clearing the in-memory Zustand state. This guarantees 
+        // synchronous token destruction and prevents stale JWT leakage during session switching.
         localStorage.removeItem('careernest-auth');
         set({ token: null, user: null, isAuth: false });
         // Force navigation to landing — window.location avoids a React Router

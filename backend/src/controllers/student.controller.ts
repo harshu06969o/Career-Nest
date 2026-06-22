@@ -2,18 +2,16 @@ import type { Request, Response } from 'express';
 import prisma from '../config/prismaClient.js';
 import { extractTextFromPdf, parseResumeWithLLM } from '../services/llm.service.js';
 
-// =============================================================================
-// getProfile
-// =============================================================================
-// GET /api/student/profile
-//
-// BUG FIX (Bug 1 + Bug 3): This route was completely missing. The Student
-// Dashboard called GET /api/student/profile on every load but no handler
-// existed, causing the profile to always appear as null/empty.
-//
-// Filters strictly by `userId: req.user.userId` — a student can ONLY ever
-// receive their own profile, preventing any cross-user data leakage.
-// =============================================================================
+/**
+ * Retrieves the profile of the currently authenticated student.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ * 
+ * @architecture
+ * Data Isolation: Strictly scopes the database query to `req.user.userId`. A student 
+ * can only ever fetch their own profile, completely eliminating cross-user data leakage.
+ */
 export const getProfile = async (req: Request, res: Response): Promise<void> => {
   // verifyToken guarantees req.user — narrow defensively for TypeScript strict mode
   if (!req.user) {
@@ -54,18 +52,12 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// =============================================================================
-// updateProfile
-// =============================================================================
-// PUT /api/student/profile
-//
-// MISSING FEATURE (Production Bug): Students had no way to set their name,
-// college, or CGPA after registration. The register controller creates a blank
-// profile (firstName: '', cgpa: 0). Without this endpoint, every student's
-// eligibility check against jobs always failed because cgpa was always 0.
-//
-// Input validation: cgpa must be a float between 0.0 and 10.0.
-// =============================================================================
+/**
+ * Updates the basic profile information for the authenticated student.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ */
 export const updateProfile = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -121,25 +113,18 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// =============================================================================
-// uploadResume
-// =============================================================================
-// Full pipeline (runs sequentially — each step's output feeds the next):
-//
-//  [multer+Cloudinary] → File streamed to Cloudinary CDN  → req.file.path = secure HTTPS URL
-//      ↓
-//  [step 1]  → fetch Cloudinary URL, extract PDF text      → cleaned raw text
-//      ↓
-//  [step 2]  → parseResumeWithLLM(text)                    → { skills, experienceYears, projects }
-//      ↓
-//  [step 3]  → prisma.studentProfile.updateMany()          → DB record updated atomically
-//      ↓
-//  [step 4]  → 200 JSON response with all saved data
-//
-// Failure contract: if ANY step throws, the entire handler returns 500.
-// Cloudinary file may remain (orphaned) but the DB is NOT updated, so the
-// profile is never left in a half-written/corrupted state.
-// =============================================================================
+/**
+ * Handles the PDF resume upload, extracts text, processes via LLM, and updates the database.
+ *
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object.
+ * 
+ * @architecture
+ * Atomic Write Operation: The parsed data is written to MongoDB using a single `updateMany` 
+ * operation (which acts atomically on the matching `userId`). This eliminates race conditions 
+ * compared to a non-atomic `findUnique` followed by `update` workflow. If any stage of the 
+ * pipeline fails (Cloudinary, PDF extraction, LLM parsing), the database write is safely aborted.
+ */
 export const uploadResume = async (req: Request, res: Response): Promise<void> => {
   // verifyToken guarantees req.user, but TypeScript doesn't know that —
   // we narrow defensively to satisfy strict mode.
@@ -164,11 +149,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   // This URL is stable, CDN-backed, and safe to store directly in MongoDB.
   const resumeUrl = req.file.path;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Step 1 + 2: PDF Text Extraction → LLM Parsing
-  // ─────────────────────────────────────────────────────────────────────────
-  // req.file.path is the Cloudinary secure URL. We fetch it and extract text.
-  // ─────────────────────────────────────────────────────────────────────────
+  // Extract text from the securely hosted Cloudinary URL
   let parsedData: Awaited<ReturnType<typeof parseResumeWithLLM>>;
 
   try {
@@ -200,13 +181,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Step 3: Single Atomic DB Write
-  // ─────────────────────────────────────────────────────────────────────────
-  // We write resumeUrl, parsedSkills, AND experienceYears in one operation.
-  // Using updateMany (returns { count }) avoids a preceding findUnique call,
-  // eliminating the read-then-write race condition on concurrent requests.
-  // ─────────────────────────────────────────────────────────────────────────
+  // Execute a single atomic database write
   try {
     const result = await prisma.studentProfile.updateMany({
       where: { userId },
@@ -235,9 +210,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Step 4: Success Response
-  // ─────────────────────────────────────────────────────────────────────────
+
   res.status(200).json({
     success: true,
     message: 'Resume uploaded and parsed successfully.',

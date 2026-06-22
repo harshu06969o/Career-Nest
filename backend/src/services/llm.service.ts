@@ -39,15 +39,18 @@ export interface ParsedResume {
 // =============================================================================
 const MAX_TEXT_CHARS = 8_000;
 
-// =============================================================================
-// extractTextFromPdf
-// =============================================================================
-// Uses pdf-parse@2.x class-based API (verified from source):
-//   new PDFParse({ data: Buffer }) → instance.getText() → TextResult.text
-//
-// KEY FIX: The constructor parameter is `data` (not `source`).
-// We call destroy() in a finally block to release internal pdfjs resources.
-// =============================================================================
+/**
+ * Extracts raw text from a given PDF buffer or secure URL.
+ *
+ * @param {string} filePathOrUrl - The secure CDN URL or local path to the PDF.
+ * @returns {Promise<string>} A cleaned and aggressively truncated text string.
+ *
+ * @architecture
+ * Buffer Conversion: Utilizes `pdf-parse@2.x` API natively supporting Buffer injection 
+ * to bypass disk I/O completely for cloud-hosted files. The text is hard-truncated to 
+ * 8,000 characters (~2,000 tokens) to guarantee the payload remains well within the Gemini 
+ * free-tier budget while dropping irrelevant verbose sections.
+ */
 export async function extractTextFromPdf(filePathOrUrl: string): Promise<string> {
   let buffer: Buffer;
 
@@ -164,14 +167,18 @@ ABSOLUTE RULES:
 7. If a field cannot be determined, return its empty default ([] for arrays, 0.0 for numbers, "" for strings).
 8. Never hallucinate skills or experience that are not present in the text.`;
 
-// =============================================================================
-// parseResumeWithLLM
-// =============================================================================
-// Core LLM call. Initializes a fresh GoogleGenAI client per invocation to
-// avoid shared state between requests. Validates the parsed structure as a
-// belt-and-suspenders check even though controlled generation enforces it —
-// any schema drift from an SDK update will surface here, not in the DB write.
-// =============================================================================
+/**
+ * Processes unstructured resume text through the Gemini LLM API to extract a structured schema.
+ *
+ * @param {string} rawText - Unstructured text extracted from the candidate's PDF.
+ * @returns {Promise<ParsedResume>} A structured JSON object containing skills and metrics.
+ *
+ * @architecture
+ * Schema Constraint Layer: Injects `responseSchema` and `responseMimeType: 'application/json'` 
+ * to activate Gemini's "Controlled Generation". This constrains the LLM at the decoding layer 
+ * to strictly emit valid JSON conforming to our Zod-equivalent interface, eliminating hallucinated 
+ * formatting. We use a regex extraction fallback to strip trailing conversational prose.
+ */
 export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume> {
   const apiKey = process.env['GEMINI_API_KEY'];
   if (!apiKey) {
@@ -288,13 +295,17 @@ ABSOLUTE RULES:
 5. If a field cannot be determined, use its zero default ([] or 0.0).
 6. Never hallucinate requirements not present in the job description.`;
 
-// =============================================================================
-// parseJobDescription
-// =============================================================================
-// Called ONCE at job creation time. The LLM result is immediately persisted to
-// MongoDB AND cached in Redis, so this call is never repeated for the same
-// job — achieving true zero-token-waste for all subsequent read requests.
-// =============================================================================
+/**
+ * Processes unstructured job description text to extract hiring requirements.
+ *
+ * @param {string} rawDescription - The plaintext job description entered by the recruiter.
+ * @returns {Promise<ParsedJobDescription>} A structured JSON object of hiring criteria.
+ *
+ * @architecture
+ * Zero-Token API Mitigation: This function executes exactly once upon job creation. The 
+ * resulting JSON schema is immediately persisted to the primary database, guaranteeing that 
+ * matching engines never re-invoke the LLM for identical job criteria.
+ */
 export async function parseJobDescription(rawDescription: string): Promise<ParsedJobDescription> {
   const apiKey = process.env['GEMINI_API_KEY'];
   if (!apiKey) {

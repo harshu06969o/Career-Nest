@@ -10,19 +10,17 @@ import prisma from '../config/prismaClient.js';
 const SALT_ROUNDS = 12; // bcrypt work factor — 12 is the production sweet spot
                         // (slow enough to resist brute-force, fast enough for UX)
 
-// =============================================================================
-// REGISTER
-// =============================================================================
-// Strategy: Create User first, then create the role-specific profile.
-// If profile creation fails, we manually delete the User (manual rollback).
-//
-// Why not prisma.$transaction()? MongoDB transactions require a REPLICA SET.
-// This works natively on Atlas (cloud), but fails on a local standalone
-// mongod instance. The manual rollback approach works in BOTH environments.
-//
-// For strict atomicity on Atlas in production, swap to:
-//   prisma.$transaction(async (tx) => { ... })
-// =============================================================================
+/**
+ * Registers a new user and provisions their role-specific profile.
+ *
+ * @param {Request} req - Express request object containing email, password, and role.
+ * @param {Response} res - Express response object.
+ * 
+ * @architecture
+ * We manually execute a two-step creation process (User -> Profile) with a programmatic rollback
+ * if the profile fails. This avoids Prisma's `$transaction` API which requires a full Replica Set
+ * on MongoDB, ensuring compatibility across both local standalone databases and cloud environments.
+ */
 export const register = async (req: Request, res: Response): Promise<void> => {
   const { email, password, role, adminSecret } = req.body as {
     email?: string;
@@ -31,7 +29,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     adminSecret?: string;
   };
 
-  // --- Input Validation ---
   if (!email || !password || !role) {
     res.status(400).json({ success: false, message: 'email, password, and role are required.' });
     return;
@@ -51,7 +48,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    // --- Check for Existing User (Case-Insensitive & Trimmed) ---
     const cleanEmail = email.trim();
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -61,15 +57,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         },
       },
     });
+    
     if (existingUser) {
       res.status(409).json({ success: false, message: 'An account with this email already exists.' });
       return;
     }
 
-    // --- Hash Password ---
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // --- Create User ---
     const user = await prisma.user.create({
       data: {
         email: cleanEmail,
@@ -78,7 +73,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    // --- Create Role-Specific Profile (with manual rollback on failure) ---
     try {
       if (role === 'STUDENT') {
         await prisma.studentProfile.create({
@@ -102,7 +96,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         });
       }
     } catch (profileError) {
-      // Rollback: remove the orphaned User record
       await prisma.user.delete({ where: { id: user.id } });
       console.error('Profile creation failed, user rolled back:', profileError);
       res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
@@ -120,12 +113,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// =============================================================================
-// LOGIN
-// =============================================================================
-// Returns a signed JWT on success. The token payload is intentionally minimal —
-// only userId and role — to avoid storing sensitive data in a decodable token.
-// =============================================================================
+/**
+ * Authenticates a user and issues a stateless JSON Web Token.
+ *
+ * @param {Request} req - Express request object containing credentials.
+ * @param {Response} res - Express response object.
+ *
+ * @architecture
+ * Uses constant-time dummy hash comparisons for invalid emails to prevent 
+ * timing-based enumeration attacks. The resulting JWT payload is minimal 
+ * (userId and role only) to enforce strict data isolation.
+ */
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body as { email?: string; password?: string };
 
@@ -135,7 +133,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    // --- Find User (Case-Insensitive & Trimmed) ---
     const cleanEmail = email.trim();
     const user = await prisma.user.findFirst({
       where: {
@@ -146,8 +143,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    // Use a constant-time comparison check — always run bcrypt.compare even if
-    // user doesn't exist (prevents timing-based user enumeration attacks)
     const dummyHash = '$2a$12$invalidhashfortimingnormalization0000000000000000000000';
     const isPasswordValid = await bcrypt.compare(
       password,
@@ -155,12 +150,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     );
 
     if (!user || !isPasswordValid) {
-      // Single generic message — never reveal whether the email or password was wrong
       res.status(401).json({ success: false, message: 'Invalid email or password.' });
       return;
     }
 
-    // --- Sign JWT ---
     const secret = process.env['JWT_SECRET'];
     if (!secret) {
       console.error('FATAL: JWT_SECRET is not set in environment variables.');
