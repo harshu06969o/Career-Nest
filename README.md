@@ -1,6 +1,6 @@
 <div align="center">
   
-![CareerNest Banner](docs/careernest-banner.png)
+![CareerNest Banner](screenshots/careernest-banner.png)
 
 # 🚀 CareerNest
 
@@ -43,11 +43,11 @@
 
 | Student Dashboard | Recruiter Job Posting |
 | :---: | :---: |
-| ![Student Dashboard - Job Matches & Skill Gap](docs/student-dashboard.png) <br> *AI Job Matches & Skill Gap Analysis* | ![Recruiter Job Posting](docs/recruiter-posting.png) <br> *AI-Assisted Job Requirements Extraction* |
+| ![Student Dashboard - Job Matches & Skill Gap](screenshots/student-dashboard.png) <br> *AI Job Matches & Skill Gap Analysis* | ![Recruiter Job Posting](screenshots/recruiter-posting.png) <br> *AI-Assisted Job Requirements Extraction* |
 
 | Applicant Tracking | Admin Stats Panel |
 | :---: | :---: |
-| ![Applicant Tracking View](docs/applicant-tracking.png) <br> *Ranked Candidate List by Match Score* | ![Admin Stats Panel](docs/admin-panel.png) <br> *Global Placement Statistics & Governance* |
+| ![Applicant Tracking View](screenshots/applicant-tracking.png) <br> *Ranked Candidate List by Match Score* | ![Admin Stats Panel](screenshots/admin-panel.png) <br> *Global Placement Statistics & Governance* |
 
 ---
 
