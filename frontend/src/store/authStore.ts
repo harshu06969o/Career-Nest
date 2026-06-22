@@ -37,6 +37,12 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, user) => set({ token, user, isAuth: true }),
 
       logout: () => {
+        // BUG FIX (Issue 1 — Stale Token Leakage):
+        // Explicitly remove the persisted store key from localStorage FIRST.
+        // Calling set({...null}) only updates in-memory Zustand state; the persist
+        // middleware may not flush the removal synchronously, leaving a stale JWT
+        // accessible to the next user on a shared browser session.
+        localStorage.removeItem('careernest-auth');
         set({ token: null, user: null, isAuth: false });
         // Force navigation to landing — window.location avoids a React Router
         // dependency in the store layer.

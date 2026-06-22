@@ -51,8 +51,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    // --- Check for Existing User ---
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    // --- Check for Existing User (Case-Insensitive & Trimmed) ---
+    const cleanEmail = email.trim();
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
+      },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'An account with this email already exists.' });
       return;
@@ -64,7 +72,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // --- Create User ---
     const user = await prisma.user.create({
       data: {
-        email,
+        email: cleanEmail,
         passwordHash,
         role: role as Role,
       },
@@ -127,8 +135,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    // --- Find User ---
-    const user = await prisma.user.findUnique({ where: { email } });
+    // --- Find User (Case-Insensitive & Trimmed) ---
+    const cleanEmail = email.trim();
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
+      },
+    });
 
     // Use a constant-time comparison check — always run bcrypt.compare even if
     // user doesn't exist (prevents timing-based user enumeration attacks)

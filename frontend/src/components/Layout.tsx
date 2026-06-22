@@ -3,7 +3,7 @@ import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import {
   GraduationCap, Briefcase, LayoutDashboard, LogOut,
-  Menu, X, Bell, LogIn, UserPlus, Shield
+  Menu, X, LogIn, UserPlus, Shield
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/cn';

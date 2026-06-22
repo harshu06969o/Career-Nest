@@ -3,6 +3,125 @@ import prisma from '../config/prismaClient.js';
 import { extractTextFromPdf, parseResumeWithLLM } from '../services/llm.service.js';
 
 // =============================================================================
+// getProfile
+// =============================================================================
+// GET /api/student/profile
+//
+// BUG FIX (Bug 1 + Bug 3): This route was completely missing. The Student
+// Dashboard called GET /api/student/profile on every load but no handler
+// existed, causing the profile to always appear as null/empty.
+//
+// Filters strictly by `userId: req.user.userId` — a student can ONLY ever
+// receive their own profile, preventing any cross-user data leakage.
+// =============================================================================
+export const getProfile = async (req: Request, res: Response): Promise<void> => {
+  // verifyToken guarantees req.user — narrow defensively for TypeScript strict mode
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId } = req.user; // BUG FIX: always scoped to the authenticated user's ID
+
+  try {
+    const profile = await prisma.studentProfile.findUnique({
+      where: { userId }, // Strict per-user filter — never returns another user's profile
+      select: {
+        id:              true,
+        firstName:       true,
+        lastName:        true,
+        college:         true,
+        cgpa:            true,
+        experienceYears: true,
+        resumeUrl:       true,
+        parsedSkills:    true,
+      },
+    });
+
+    if (!profile) {
+      // 404 is expected for new users who haven't completed onboarding
+      res.status(404).json({
+        success: false,
+        message: 'Student profile not found. Please complete your profile setup.',
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: profile });
+  } catch (dbError) {
+    console.error('[DB] studentProfile.findUnique (getProfile) failed:', dbError);
+    res.status(500).json({ success: false, message: 'Failed to retrieve profile.' });
+  }
+};
+
+// =============================================================================
+// updateProfile
+// =============================================================================
+// PUT /api/student/profile
+//
+// MISSING FEATURE (Production Bug): Students had no way to set their name,
+// college, or CGPA after registration. The register controller creates a blank
+// profile (firstName: '', cgpa: 0). Without this endpoint, every student's
+// eligibility check against jobs always failed because cgpa was always 0.
+//
+// Input validation: cgpa must be a float between 0.0 and 10.0.
+// =============================================================================
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId } = req.user;
+
+  const { firstName, lastName, college, cgpa, experienceYears } = req.body as {
+    firstName?: string;
+    lastName?: string;
+    college?: string;
+    cgpa?: number;
+    experienceYears?: number;
+  };
+
+  // Validate CGPA range
+  const cgpaFloat = cgpa !== undefined ? parseFloat(String(cgpa)) : undefined;
+  if (cgpaFloat !== undefined && (isNaN(cgpaFloat) || cgpaFloat < 0 || cgpaFloat > 10)) {
+    res.status(400).json({ success: false, message: 'cgpa must be a number between 0.0 and 10.0.' });
+    return;
+  }
+
+  const expFloat = experienceYears !== undefined ? parseFloat(String(experienceYears)) : undefined;
+
+  try {
+    const result = await prisma.studentProfile.updateMany({
+      where: { userId },
+      data: {
+        ...(firstName !== undefined && { firstName: firstName.trim() }),
+        ...(lastName  !== undefined && { lastName:  lastName.trim()  }),
+        ...(college   !== undefined && { college:   college.trim()   }),
+        ...(cgpaFloat !== undefined && { cgpa:      cgpaFloat        }),
+        ...(expFloat  !== undefined && { experienceYears: expFloat   }),
+      },
+    });
+
+    if (result.count === 0) {
+      res.status(404).json({ success: false, message: 'Student profile not found.' });
+      return;
+    }
+
+    // Return updated profile
+    const updated = await prisma.studentProfile.findUnique({
+      where: { userId },
+      select: { id: true, firstName: true, lastName: true, college: true, cgpa: true, experienceYears: true, resumeUrl: true, parsedSkills: true },
+    });
+
+    res.status(200).json({ success: true, message: 'Profile updated successfully.', data: updated });
+  } catch (dbError) {
+    console.error('[DB] studentProfile.updateMany (updateProfile) failed:', dbError);
+    res.status(500).json({ success: false, message: 'Failed to update profile.' });
+  }
+};
+
+// =============================================================================
 // uploadResume
 // =============================================================================
 // Full pipeline (runs sequentially — each step's output feeds the next):
@@ -53,7 +172,7 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   let parsedData: Awaited<ReturnType<typeof parseResumeWithLLM>>;
 
   try {
-    console.log(`[LLM Pipeline] Extracting text from: ${req.file.path}`);
+    console.log(`[LLM Pipeline] Extracting text from Cloudinary URL: ${req.file.path}`);
     const rawText = await extractTextFromPdf(req.file.path);
 
     if (!rawText || rawText.trim().length < 20) {
@@ -66,7 +185,8 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
 
     console.log(`[LLM Pipeline] Extracted ${rawText.length} chars. Sending to Gemini...`);
     parsedData = await parseResumeWithLLM(rawText);
-    console.log(`[LLM Pipeline] Parsed successfully. Skills: ${parsedData.skills.length}, Exp: ${parsedData.experienceYears}yr`);
+    console.log(`[LLM Pipeline] Parsed successfully. Exp: ${parsedData.experienceYears}yr`);
+    console.log(`[LLM Pipeline] Extracted Skills Array:`, parsedData.skills);
   } catch (llmError) {
     // We log the full error server-side but return a safe message to the client.
     // The file is on disk but the DB is untouched — no corrupted state.

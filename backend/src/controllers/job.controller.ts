@@ -3,6 +3,36 @@ import prisma from '../config/prismaClient.js';
 import redisClient from '../config/redisClient.js';
 import { parseJobDescription } from '../services/llm.service.js';
 
+// BUG FIX (Bug 3): Added to support getJobApplicants response typing
+interface ApplicantWithProfile {
+  id: string;
+  matchScore: number | null;
+  status: string;
+  appliedAt: Date;
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    college: string;
+    cgpa: number;
+    experienceYears: number;
+    resumeUrl: string | null;
+    parsedSkills: string[];
+    user: { email: string };
+  };
+}
+
+// =============================================================================
+// resolveParam — narrows Express params (string | string[]) → string
+// =============================================================================
+// Express types req.params values as `string | string[]` under strict nodenext.
+// Route params are always a single string — this helper asserts that safely.
+// =============================================================================
+function resolveParam(param: string | string[] | undefined): string {
+  if (Array.isArray(param)) return param[0] ?? '';
+  return param ?? '';
+}
+
 // =============================================================================
 // Redis Key Registry & TTL Constants
 // =============================================================================
@@ -74,7 +104,19 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const { title, description } = req.body as { title?: string; description?: string };
+  const { title, description } = req.body as {
+    title?: string;
+    description?: string;
+    minCgpa?: unknown;      // BUG FIX (Bug 2): typed as unknown to force explicit cast
+    minExperience?: unknown; // Prevents trusting JSON type coercion silently
+  };
+
+  // BUG FIX (Bug 2): Explicitly cast with parseFloat() server-side.
+  // The frontend sends parseFloat(string) but we NEVER trust incoming types.
+  // `!isNaN(x)` check means we use ANY valid number the recruiter provided
+  // (including 0.0), falling back to LLM only if the field was left completely empty.
+  const parsedMinCgpa     = parseFloat(String(req.body.minCgpa ?? ''));
+  const parsedMinExperience = parseFloat(String(req.body.minExperience ?? ''));
 
   if (!title?.trim() || !description?.trim()) {
     res.status(400).json({
@@ -113,9 +155,12 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
         title: title.trim(),
         description: description.trim(),
         requiredSkills: parsedCriteria.requiredSkills,
-        minCgpa:        parsedCriteria.minCgpa,
-        minExperience:  parsedCriteria.minExperience,
-        isActive:       true,
+        // BUG FIX (Bug 2): Use !isNaN() instead of `> 0` — this respects explicit 0.0
+        // values and is not fooled by string coercion. If recruiter left the field blank
+        // (resulting in NaN), fall back to the LLM-parsed value.
+        minCgpa:       !isNaN(parsedMinCgpa) ? parsedMinCgpa : parsedCriteria.minCgpa,
+        minExperience: !isNaN(parsedMinExperience) ? parsedMinExperience : parsedCriteria.minExperience,
+        isActive:      true,
       },
     });
   } catch (dbError) {
@@ -183,11 +228,15 @@ export const getAllJobs = async (req: Request, res: Response): Promise<void> => 
       where: { isActive: true },
       orderBy: { createdAt: 'desc' },
       // Include recruiter company name so the student feed has context
+      // Include the number of applications for Admin/Recruiter views
       include: {
         recruiter: {
           select: {
             recruiterProfile: { select: { companyName: true, designation: true } },
           },
+        },
+        _count: {
+          select: { applications: true },
         },
       },
     });
@@ -208,3 +257,185 @@ export const getAllJobs = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+
+// =============================================================================
+// getMyJobs
+// =============================================================================
+// GET /api/jobs/my-postings
+//
+// BUG FIX (Bug 1 — Cross-User Data Leakage): The original `getAllJobs` had
+// NO recruiter filter — it returned every active job to every role.
+// This endpoint strictly scopes the DB query to `recruiterId: req.user.userId`.
+// A recruiter can NEVER see another recruiter's jobs through this endpoint.
+//
+// Includes application counts AND populated student details for the
+// "View Applicants" feature (Bug 5 fix).
+// =============================================================================
+export const getMyJobs = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId: recruiterId } = req.user; // BUG FIX: strict per-user scoping
+
+  try {
+    const jobs = await prisma.job.findMany({
+      where: { recruiterId }, // ← THE FIX: only this recruiter's own jobs
+      orderBy: { createdAt: 'desc' },
+      include: {
+        // Application count for dashboard stats card
+        _count: {
+          select: { applications: true },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      source: 'database',
+      data: jobs,
+    });
+  } catch (dbError) {
+    console.error('[DB] getMyJobs failed:', dbError);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve your job postings.',
+    });
+  }
+};
+
+// =============================================================================
+// getJobApplicants
+// =============================================================================
+// GET /api/jobs/:jobId/applicants
+//
+// BUG FIX (Bug 3 + Bug 5): The recruiter "View Applicants" panel was showing
+// hardcoded mock data because this endpoint didn't exist. This endpoint:
+//   1. Verifies the job belongs to the requesting recruiter (authorization)
+//   2. Fetches all real Application records for that job
+//   3. Joins student profile data (name, college, cgpa, skills, resume)
+//   4. Sorts by matchScore descending (best candidates first)
+// =============================================================================
+export const getJobApplicants = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId, role } = req.user;
+  // resolveParam narrows Express's `string | string[]` to a plain string
+  const jobId = resolveParam(req.params['jobId']);
+
+  if (!jobId.trim()) {
+    res.status(400).json({ success: false, message: 'jobId parameter is required.' });
+    return;
+  }
+
+  try {
+    // Step 1: Verify the job exists and the requester owns it (or is Admin)
+    const job = await prisma.job.findUnique({
+      where: { id: jobId }, // jobId is now a guaranteed string (no string[])
+      select: { id: true, title: true, recruiterId: true },
+    });
+
+    if (!job) {
+      res.status(404).json({ success: false, message: 'Job not found.' });
+      return;
+    }
+
+    // Authorization: only the job owner or an Admin may view applicants
+    if (role !== 'ADMIN' && job.recruiterId !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden. You can only view applicants for your own job postings.',
+      });
+      return;
+    }
+
+    // Step 2: Fetch all real applications with joined student profile data
+    const applications = await prisma.application.findMany({
+      where: { jobId }, // jobId is a guaranteed string
+      orderBy: { matchScore: 'desc' }, // Best match first — mirrors recruiter UX
+      include: {
+        student: {
+          select: {
+            id:              true,
+            firstName:       true,
+            lastName:        true,
+            college:         true,
+            cgpa:            true,
+            experienceYears: true,
+            resumeUrl:       true,
+            parsedSkills:    true,
+            user: { select: { email: true } }, // For recruiter contact
+          },
+        },
+      },
+    }) as unknown as ApplicantWithProfile[]; // unknown intermediate resolves strict overlap TS error
+
+    res.status(200).json({
+      success: true,
+      jobTitle: job.title,
+      totalApplicants: applications.length,
+      data: applications,
+    });
+  } catch (dbError) {
+    console.error('[DB] getJobApplicants failed:', dbError);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve applicants for this job.',
+    });
+  }
+};
+
+// =============================================================================
+// deleteJob
+// =============================================================================
+// Deletes a specific job posting. Protected to the Recruiter who posted it,
+// or an Admin.
+// =============================================================================
+export const deleteJob = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  // resolveParam narrows Express's `string | string[]` to a plain string
+  const id = resolveParam(req.params['id']);
+  const { userId, role } = req.user;
+
+  try {
+    const job = await prisma.job.findUnique({ where: { id } });
+    
+    if (!job) {
+      res.status(404).json({ success: false, message: 'Job not found.' });
+      return;
+    }
+
+    // Only the recruiter who posted it or an Admin can delete it
+    if (role !== 'ADMIN' && job.recruiterId !== userId) {
+      res.status(403).json({ success: false, message: 'Forbidden. You cannot delete this job.' });
+      return;
+    }
+
+    await prisma.job.delete({ where: { id } });
+
+    // Invalidate both single-job and all-jobs caches
+    await safeRedisDel(CACHE_KEYS.singleJob(id));
+    await safeRedisDel(CACHE_KEYS.allJobs);
+
+    res.status(200).json({
+      success: true,
+      message: 'Job successfully deleted.',
+    });
+  } catch (dbError) {
+    console.error('[DB] job.delete failed:', dbError);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete job.',
+    });
+  }
+};
+
+

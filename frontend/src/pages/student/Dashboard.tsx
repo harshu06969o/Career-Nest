@@ -69,6 +69,7 @@ export default function StudentDashboard() {
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [uploading,  setUploading]  = useState(false);
   const [applying,   setApplying]   = useState<string | null>(null); // jobId
+  const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set()); // Track applied jobs
   const [dragOver,   setDragOver]   = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -135,11 +136,14 @@ export default function StudentDashboard() {
   const handleApply = async (jobId: string, jobTitle: string) => {
     setApplying(jobId);
     try {
-      const { data } = await api.post<{ data: { matchScore: number } }>(
+      await api.post(
         `/eligibility/apply/${jobId}`,
       );
       toast.success(`Successfully applied to "${jobTitle}"! 🎉`);
-      await fetchMatches();
+      // FIXED (Issue 4): Instead of refetching the API and causing UI jumpiness, 
+      // we maintain an appliedJobs set in local state to immediately show 'Applied'.
+      setAppliedJobs(prev => new Set(prev).add(jobId)); // Add to local state
+      // We don't refetch all matches to save UI jumpiness, relying on local state
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
@@ -385,22 +389,26 @@ export default function StudentDashboard() {
                     {/* Apply button */}
                     <button
                       onClick={() => void handleApply(job.id, job.title)}
-                      disabled={applying === job.id || matchScore < 50}
+                      disabled={applying === job.id || matchScore < 50 || appliedJobs.has(job.id)}
                       className={cn(
                         'flex-shrink-0 flex items-center justify-center gap-2 px-6 py-3 rounded-lg',
                         'text-sm font-semibold transition-all duration-200 shadow-sm w-full sm:w-auto',
-                        matchScore >= 50
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] active:scale-[0.98]'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700',
+                        appliedJobs.has(job.id)
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-not-allowed'
+                          : matchScore >= 50
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] active:scale-[0.98]'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700',
                         applying === job.id && 'opacity-70 cursor-not-allowed',
                       )}
                     >
                       {applying === job.id ? (
                         <Loader2 size={16} className="animate-spin" />
+                      ) : appliedJobs.has(job.id) ? (
+                        <CheckCircle size={16} />
                       ) : (
                         <ChevronRight size={16} />
                       )}
-                      {matchScore >= 50 ? 'Apply Now' : 'Below threshold'}
+                      {appliedJobs.has(job.id) ? 'Applied' : matchScore >= 50 ? 'Apply Now' : 'Below threshold'}
                     </button>
                   </div>
 

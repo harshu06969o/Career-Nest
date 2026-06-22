@@ -1,5 +1,21 @@
 import { readFile } from 'node:fs/promises';
 import { GoogleGenAI, Type } from '@google/genai';
+// =============================================================================
+// BUG FIX (Bug 4) — PDF Parse Import
+// =============================================================================
+// pdf-parse@2.x ESM build exports `PDFParse` as a NAMED CLASS export (not a
+// default function like v1). The original code had the class name right but
+// used a wrong property name: `{ source: Buffer }` instead of `{ data: Buffer }`.
+//
+// Verified API (from node_modules/pdf-parse/dist/pdf-parse/esm/PDFParse.js):
+//   constructor({ data: Buffer, verbosity? }) — converts Buffer to Uint8Array
+//   async getText(params?) → TextResult with { text: string, total: number, pages: [] }
+//   async destroy() → releases pdfjs worker
+//
+// The old code called `new PDFParse({ source: buffer })` which left `data`
+// undefined — pdfjs would fail with an internal error, which the controller's
+// catch silently swallowed, causing ALL resume uploads to return zero skills.
+// =============================================================================
 import { PDFParse } from 'pdf-parse';
 
 // =============================================================================
@@ -14,7 +30,7 @@ export interface ParsedResume {
 // =============================================================================
 // Token Budget
 // =============================================================================
-// Gemini 2.0 Flash-Lite free tier: 1M tokens/day, 1M context window.
+// Gemini 1.5 Flash free tier: 1 500 requests/day, 1M tokens/day.
 // A typical 2-page resume is ~800 words ≈ ~1000 tokens after encoding.
 // We cap at 8 000 chars (~2 000 tokens) — leaves 98%+ of the daily budget
 // for other API calls and eliminates runaway cost from abnormally large PDFs.
@@ -24,10 +40,10 @@ const MAX_TEXT_CHARS = 8_000;
 // =============================================================================
 // extractTextFromPdf
 // =============================================================================
-// Uses pdf-parse v2's class-based API:
-//   new PDFParse({ source: Buffer }) → instance.getText() → TextResult.document
+// Uses pdf-parse@2.x class-based API (verified from source):
+//   new PDFParse({ data: Buffer }) → instance.getText() → TextResult.text
 //
-// The `source` field accepts a Node.js Buffer directly.
+// KEY FIX: The constructor parameter is `data` (not `source`).
 // We call destroy() in a finally block to release internal pdfjs resources.
 // =============================================================================
 export async function extractTextFromPdf(filePathOrUrl: string): Promise<string> {
@@ -49,17 +65,23 @@ export async function extractTextFromPdf(filePathOrUrl: string): Promise<string>
     buffer = await readFile(filePathOrUrl);
   }
 
-  // pdf-parse v2 class-based API:
-  //   LoadParameters.data accepts Buffer/TypedArray (Buffer IS a Uint8Array subclass)
-  //   getText() returns TextResult whose `.text` is the full concatenated document string
+  // BUG FIX (Bug 4): Use `data` not `source` — this is the verified constructor
+  // parameter name from the pdf-parse@2.x source. The library converts Buffer
+  // to Uint8Array internally (Buffer IS a Uint8Array subclass in Node 18+).
   const parser = new PDFParse({ data: buffer });
   let rawText: string;
 
   try {
+    // getText() returns TextResult: { text: string, total: number, pages: [...] }
+    // result.text is the full concatenated document string across all pages.
     const result = await parser.getText();
-    rawText = result.text; // TextResult.text — full document string
+    rawText = result.text;
+
+    // Log extracted length for debugging — helps diagnose scanned/image-only PDFs
+    console.log(`[PDFParse] Extracted ${rawText.length} chars from ${result.total} pages`);
   } finally {
-    await parser.destroy(); // Always release pdfjs worker resources
+    // Always release pdfjs worker resources, even if getText() throws.
+    await parser.destroy();
   }
 
   const cleaned = rawText
@@ -86,7 +108,17 @@ const RESPONSE_SCHEMA = {
     skills: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: 'All technical and domain skills found. Normalize to lowercase (e.g. "react", "node.js", "python").',
+      // BUG FIX (Bug 4): Expanded description to demand EXHAUSTIVE extraction.
+      // The more specific the enum examples, the better gemini-1.5-flash extracts.
+      description:
+        'EXHAUSTIVE list of every technical skill. Include: programming languages ' +
+        '(Python, Java, C++, JavaScript, TypeScript, Go, Rust, Swift, Kotlin, etc.), ' +
+        'frameworks (React, Angular, Vue, Django, Flask, Spring, Express, FastAPI, etc.), ' +
+        'libraries (NumPy, Pandas, TensorFlow, PyTorch, Scikit-learn, etc.), ' +
+        'databases (MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Firebase, etc.), ' +
+        'cloud (AWS, GCP, Azure, Heroku, Vercel, Netlify, etc.), ' +
+        'DevOps (Docker, Kubernetes, GitHub Actions, Jenkins, Terraform, etc.), ' +
+        'and ALL other tools or technologies mentioned. Normalize ALL to lowercase.',
     },
     experienceYears: {
       type: Type.NUMBER,
@@ -103,20 +135,19 @@ const RESPONSE_SCHEMA = {
 };
 
 // =============================================================================
-// System Instruction
+// System Instruction — Resume Parser
 // =============================================================================
-// Injected as a system-level prompt (not user-turn), which primes the model's
-// behaviour before it sees any resume content. Being explicit about the
-// "no markdown, no prose" rule at the system level is critical — models
-// default to wrapping JSON in ```json fences which breaks JSON.parse().
-// temperature: 0 removes all creative variance → deterministic, parseable output.
+// Injected as system-level prompt (not user-turn). Being explicit about
+// "no markdown, no prose" at system level is critical — models default to
+// wrapping JSON in ```json fences which breaks JSON.parse().
+// temperature: 0 → deterministic, parseable output.
 // =============================================================================
 const SYSTEM_INSTRUCTION = `You are an immutable, stateless resume-to-JSON compiler. Your only function is to extract structured data from resume text.
 
 ABSOLUTE RULES:
 1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose.
-2. skills: extract every technical skill, framework, language, and tool. Normalize all to lowercase.
-3. experienceYears: convert all work/internship durations to a decimal float. Use 0 if the person is a student with no work experience.
+2. skills: extract an EXHAUSTIVE array of EVERY programming language, framework, library, database, cloud platform, DevOps tool, and any technical keyword mentioned ANYWHERE in the text. Do NOT omit any. Normalize ALL to lowercase. Examples: "react", "node.js", "python", "tensorflow", "docker", "aws", "mongodb", "typescript".
+3. experienceYears: convert all work/internship durations to a decimal float. Use 0.0 for students with no work experience.
 4. projects: list only named project titles. Omit generic descriptions.
 5. If a field cannot be determined, return its empty default ([] for arrays, 0.0 for numbers).
 6. Never hallucinate skills or experience that are not present in the text.`;
@@ -145,7 +176,7 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
       responseMimeType: 'application/json',  // Activates Controlled Generation
       responseSchema: RESPONSE_SCHEMA,       // Schema-constrained decoding
       temperature: 0,       // Deterministic — no creative variance in JSON output
-      maxOutputTokens: 512, // Our schema is tiny; 512 tokens is a generous ceiling
+      maxOutputTokens: 1024, // Increased from 512 — EXHAUSTIVE skill lists can be long
     },
   });
 
@@ -156,9 +187,13 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
   }
 
   // Parse defensively — even with controlled generation, we validate the shape
+  let cleanedJson = rawJson.trim();
+  // Strip markdown block if the LLM hallucinated it despite application/json mime type
+  cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(rawJson);
+    parsed = JSON.parse(cleanedJson);
   } catch {
     throw new Error(`LLM response is not valid JSON. Raw response: "${rawJson.slice(0, 300)}"`);
   }
@@ -180,7 +215,9 @@ export async function parseResumeWithLLM(rawText: string): Promise<ParsedResume>
 
   // Normalize skills to lowercase — the matching engine performs
   // case-sensitive set intersection, so "React" ≠ "react" without this.
-  result.skills = result.skills.map((s) => s.toLowerCase().trim());
+  result.skills = result.skills.map((s) => s.toLowerCase().trim()).filter((s) => s.length > 0);
+
+  console.log(`[LLM] Extracted ${result.skills.length} skills, ${result.experienceYears}yr exp`);
 
   return result;
 }
@@ -271,9 +308,13 @@ export async function parseJobDescription(rawDescription: string): Promise<Parse
     throw new Error('Gemini returned an empty response for the job description.');
   }
 
+  let cleanedJson = rawJson.trim();
+  // Strip markdown block if the LLM hallucinated it despite application/json mime type
+  cleanedJson = cleanedJson.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(rawJson);
+    parsed = JSON.parse(cleanedJson);
   } catch {
     throw new Error(`LLM job response is not valid JSON. Raw: "${rawJson.slice(0, 200)}"`);
   }

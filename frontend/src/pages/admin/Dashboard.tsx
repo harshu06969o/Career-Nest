@@ -13,6 +13,7 @@ interface Job {
   requiredSkills: string[];
   isActive:       boolean;
   createdAt:      string;
+  _count?:        { applications: number };
   recruiter?: {
     recruiterProfile?: { companyName: string; designation: string } | null;
   };
@@ -116,6 +117,7 @@ export default function AdminDashboard() {
                 <th className="px-6 py-4 font-semibold border-b border-slate-700">Job Title</th>
                 <th className="px-6 py-4 font-semibold border-b border-slate-700">Company / Recruiter</th>
                 <th className="px-6 py-4 font-semibold border-b border-slate-700">Required Skills</th>
+                <th className="px-6 py-4 font-semibold border-b border-slate-700">Applicants</th>
                 <th className="px-6 py-4 font-semibold border-b border-slate-700">Status</th>
                 <th className="px-6 py-4 font-semibold border-b border-slate-700">Date Posted</th>
               </tr>
@@ -168,6 +170,9 @@ export default function AdminDashboard() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap border-b border-slate-800 text-slate-300 font-semibold">
+                      {job._count?.applications ?? 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap border-b border-slate-800">
                       <span className={cn(
