@@ -3,7 +3,7 @@ import {
   PlusCircle, Briefcase, Users, Loader2,
   Sparkles, ChevronDown, ChevronUp, RefreshCw,
   Search, Mail, Trash2,
-  FileText, ExternalLink
+  FileText, ExternalLink, Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
@@ -65,6 +65,8 @@ export default function RecruiterDashboard() {
   const [viewingApplicantsFor, setViewingApplicantsFor] = useState<string | null>(null);
   const [applicants, setApplicants] = useState<RealApplicant[]>([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
+  // Tracks which applicant's resume is currently being downloaded (shows spinner)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
 
   const [title, setTitle] = useState('');
@@ -160,6 +162,79 @@ export default function RecruiterDashboard() {
     }
   };
 
+
+  // ===========================================================================
+  // handleDownloadResume — Blob-based PDF Download
+  // ===========================================================================
+  // WHY NOT fl_attachment URL injection:
+  //   Cloudinary only supports transformation flags (fl_attachment, fl_attachment:filename)
+  //   on `image` and `video` resource types. Our resumes are uploaded as resource_type:
+  //   "raw", which deliberately bypasses Cloudini's transformation pipeline. Injecting
+  //   `fl_attachment` into a raw URL simply returns a 400 or serves the file unchanged.
+  //
+  // WHY NOT <a href={url} download>:
+  //   The HTML `download` attribute is silently ignored by all browsers for cross-origin
+  //   URLs (Cloudinary's domain ≠ your app's domain) — it falls back to navigation,
+  //   opening the raw binary as text in the tab.
+  //
+  // THE FIX — fetch → Blob → createObjectURL:
+  //   1. We fetch the raw PDF bytes directly (no axios interceptors — plain fetch).
+  //   2. We explicitly wrap the bytes in a new Blob({ type: 'application/pdf' }).
+  //      This forces the browser to treat the data as a PDF regardless of the
+  //      Content-Type header the remote server sent.
+  //   3. We create a fully local blob:// URL via URL.createObjectURL(blob).
+  //   4. We click an invisible <a> with the blob URL + download attribute.
+  //      The `download` attribute WORKS on same-origin blob:// URLs, so the
+  //      browser always saves it as a named .pdf file — no CORS issue at all.
+  //   5. We immediately revoke the blob URL to free memory.
+  //
+  // ⚠️  TEST WITH A NEWLY UPLOADED RESUME:
+  //     Old database URLs were generated before Cloudinary was configured with
+  //     resource_type: "raw" and the careernest_resumes folder. Re-upload from
+  //     the Student Dashboard to generate a valid, fetchable URL before testing.
+  // ===========================================================================
+  const handleDownloadResume = async (resumeUrl: string, studentName: string, applicantId: string) => {
+    setDownloadingId(applicantId);
+    try {
+      // Step 1: Fetch the raw PDF bytes from Cloudinary.
+      // Using native fetch (not axios) to avoid the JWT interceptor adding
+      // an Authorization header to the Cloudinary request (would cause a 401).
+      const response = await fetch(resumeUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch resume: ${response.status} ${response.statusText}`);
+      }
+
+      // Step 2: Read as ArrayBuffer and wrap in a Blob with forced MIME type.
+      // This guarantees the browser treats the data as a PDF even if Cloudinary
+      // served it with a generic Content-Type: application/octet-stream header.
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+
+      // Step 3: Create a fully local blob:// URL.
+      // blob:// URLs are same-origin by definition — the `download` attribute
+      // is guaranteed to work here.
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      // Step 4: Build a sanitized filename and trigger the download.
+      const safeName = studentName.trim().replace(/\s+/g, '_') || 'resume';
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `${safeName}_Resume.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Step 5: Revoke the blob URL immediately after click to free memory.
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success(`Downloaded ${safeName}'s resume`);
+    } catch (err) {
+      console.error('[Download] Resume fetch failed:', err);
+      toast.error('Failed to download resume. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const totalApps = jobs.reduce((s, j) => s + (j._count?.applications ?? 0), 0);
   const activeJobs = jobs.filter((j) => j.isActive).length;
@@ -458,18 +533,49 @@ export default function RecruiterDashboard() {
                               </div>
 
                               <div className="flex items-center gap-3 flex-shrink-0">
-                                {/* Resume link — only shown if student has uploaded */}
+                                {/* Resume Actions — only shown if student has uploaded a resume */}
+                                {/* BUG 1 PERMANENT FIX:
+                                    The `download` attribute is silently ignored by all browsers
+                                    for cross-origin URLs (Cloudinary is on a different domain).
+                                    Strategy: handleDownloadResume() injects `fl_attachment` directly
+                                    into the Cloudinary CDN URL path. This forces Cloudinary's server
+                                    to respond with Content-Disposition: attachment headers,
+                                    making the browser save it as a named PDF file — no CORS issue.
+                                    ⚠️ Test ONLY with a newly uploaded resume. Old URLs may be stale. */}
                                 {applicant.student.resumeUrl ? (
-                                  <a
-                                    href={applicant.student.resumeUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-100 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
-                                  >
-                                    <FileText size={14} />
-                                    Resume
-                                    <ExternalLink size={12} />
-                                  </a>
+                                  <div className="flex items-center gap-2">
+                                    {/* View: opens inline in new tab for quick preview */}
+                                    <a
+                                      href={applicant.student.resumeUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                                      title="View resume in new tab"
+                                    >
+                                      <FileText size={14} />
+                                      View
+                                      <ExternalLink size={12} />
+                                    </a>
+                                    {/* Download: fetch→Blob→createObjectURL pattern
+                                        bypasses ALL cross-origin download restrictions */}
+                                    <button
+                                      type="button"
+                                      disabled={downloadingId === applicant.id}
+                                      onClick={() => {
+                                        const name = `${applicant.student.firstName} ${applicant.student.lastName}`.trim()
+                                          || applicant.student.user.email;
+                                        void handleDownloadResume(applicant.student.resumeUrl!, name, applicant.id);
+                                      }}
+                                      className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      title="Download resume as PDF"
+                                    >
+                                      {downloadingId === applicant.id
+                                        ? <Loader2 size={14} className="animate-spin" />
+                                        : <Download size={14} />
+                                      }
+                                      {downloadingId === applicant.id ? 'Downloading…' : 'Download'}
+                                    </button>
+                                  </div>
                                 ) : (
                                   <span className="px-4 py-2 bg-slate-950 text-slate-500 text-sm rounded-lg border border-slate-800">
                                     No Resume

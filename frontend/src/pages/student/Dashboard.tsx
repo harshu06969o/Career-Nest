@@ -25,6 +25,7 @@ interface StudentProfile {
 
 interface MatchedJob {
   matchScore: number;
+  hasApplied: boolean; // BUG 2 FIX: injected by backend so apply state survives page refresh
   job: {
     id:            string;
     title:         string;
@@ -96,7 +97,16 @@ export default function StudentDashboard() {
     setLoadingMatches(true);
     try {
       const { data } = await api.get<{ data: MatchedJob[] }>('/eligibility/matches');
-      setMatches(data.data);
+      const fetched = data.data ?? [];
+      setMatches(fetched);
+
+      // BUG 2 FIX: Initialize appliedJobs Set from the hasApplied flags the
+      // backend injected. This ensures the 'Applied' button state is correct
+      // on every page load — not just within the same session.
+      const preApplied = new Set(
+        fetched.filter((m) => m.hasApplied).map((m) => m.job.id),
+      );
+      setAppliedJobs(preApplied);
     } catch {
       // Silently fail — matches can be empty while resume is pending
     } finally {

@@ -30,6 +30,7 @@ interface JobRecord {
 
 interface RankedJob {
   matchScore: number;
+  hasApplied: boolean; // BUG 2 FIX: injected so frontend knows applied state on page load
   job: JobRecord;
 }
 
@@ -321,7 +322,26 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // ── Step 2: Load active jobs (cache-first) ────────────────────────────────
+    // ── Step 2: Fetch student's existing application jobIds (one query) ────────
+    // We fetch ALL jobIds this student has already applied to in a single DB
+    // query. Using a Set for O(1) lookups when tagging each ranked job below.
+    // This is the key fix for Bug 2: without this, the frontend initializes
+    // appliedJobs as an empty Set on every page load, losing applied state.
+    let appliedJobIdSet: Set<string>;
+    try {
+      const existingApplications = await prisma.application.findMany({
+        where: { studentId: studentProfile.id },
+        select: { jobId: true }, // Minimal projection — we only need the jobId
+      });
+      appliedJobIdSet = new Set(existingApplications.map((a) => a.jobId));
+      console.log(`[Matcher] Student ${userId} has ${appliedJobIdSet.size} existing application(s)`);
+    } catch (appError) {
+      // Non-fatal: if this query fails, we still return matches — just without hasApplied
+      console.error('[getStudentMatches] Failed to fetch existing applications:', appError);
+      appliedJobIdSet = new Set();
+    }
+
+    // ── Step 3: Load active jobs (cache-first) ────────────────────────────────
     let jobs: JobRecord[];
     try {
       jobs = await fetchActiveJobs();
@@ -340,7 +360,7 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // ── Step 3: Score every job against this student ──────────────────────────
+    // ── Step 4: Score every job and tag with hasApplied ──────────────────────
     // calculateMatchScore is a pure function — safe to call in a tight loop.
     const studentInput: StudentMatchInput = {
       parsedSkills:    studentProfile.parsedSkills,
@@ -357,6 +377,10 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
         };
         return {
           matchScore: calculateMatchScore(studentInput, jobInput),
+          // BUG 2 FIX: inject hasApplied so the frontend can correctly
+          // render the 'Applied' button state on initial page load without
+          // needing a separate round-trip or page-level refetch.
+          hasApplied: appliedJobIdSet.has(job.id),
           job,
         };
       })
