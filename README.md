@@ -1,6 +1,5 @@
 <div align="center">
   
-![CareerNest Banner](screenshots/careernest-banner.png)
 
 # 🚀 CareerNest
 
