@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { verifyToken, requireRole } from '../middlewares/auth.middleware.js';
 import { uploadResumeSingle } from '../middlewares/upload.middleware.js';
-import { uploadResume, getProfile, updateProfile } from '../controllers/student.controller.js';
+import { uploadResume, getProfile, updateProfile, getRecruiterProfile, updateRecruiterProfile } from '../controllers/student.controller.js';
 
 const router = Router();
 
@@ -35,6 +35,26 @@ router.put(
   verifyToken,
   requireRole(['STUDENT']),
   updateProfile,
+);
+
+// =============================================================================
+// GET /api/student/recruiter-profile
+// =============================================================================
+router.get(
+  '/recruiter-profile',
+  verifyToken,
+  requireRole(['RECRUITER']),
+  getRecruiterProfile,
+);
+
+// =============================================================================
+// PUT /api/student/recruiter-profile
+// =============================================================================
+router.put(
+  '/recruiter-profile',
+  verifyToken,
+  requireRole(['RECRUITER']),
+  updateRecruiterProfile,
 );
 
 // =============================================================================

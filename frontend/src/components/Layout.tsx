@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/cn';
+import ProfilePanel from './ProfilePanel';
 
 /**
  * Global application shell component.
@@ -28,6 +29,7 @@ export default function Layout() {
   const navigate          = useNavigate();
   const location          = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const isStudent   = user?.role === 'STUDENT';
   const isRecruiter = user?.role === 'RECRUITER';
@@ -122,6 +124,19 @@ export default function Layout() {
                   </span>
                 )}
 
+                <div className="h-5 w-px bg-slate-200 mx-1" />
+
+                {/* Avatar Button */}
+                <button
+                  onClick={() => setIsProfileOpen(true)}
+                  className="w-9 h-9 ml-1 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm hover:ring-2 hover:ring-indigo-300 transition-all duration-150"
+                  aria-label="Open profile settings"
+                >
+                  <span className="text-white text-sm font-bold tracking-wide">
+                    {user?.email?.substring(0, 2).toUpperCase() || 'U'}
+                  </span>
+                </button>
+
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
@@ -200,6 +215,17 @@ export default function Layout() {
                 <div className="h-px bg-slate-200 my-2" />
 
                 <button
+                  onClick={() => { setMenuOpen(false); setIsProfileOpen(true); }}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
+                             text-indigo-600 hover:bg-indigo-50 transition-colors"
+                >
+                  <UserPlus size={15} />
+                  Profile Settings
+                </button>
+
+                <div className="h-px bg-slate-200 my-2" />
+
+                <button
                   onClick={() => { setMenuOpen(false); handleLogout(); }}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
                              text-red-600 hover:bg-red-50 transition-colors"
@@ -240,6 +266,12 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Profile Settings Panel */}
+      <ProfilePanel 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+      />
     </div>
   );
 }

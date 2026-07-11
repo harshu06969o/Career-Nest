@@ -224,3 +224,75 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
     },
   });
 };
+
+// =============================================================================
+// RECRUITER PROFILE CONTROLLERS
+// =============================================================================
+
+export const getRecruiterProfile = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId } = req.user;
+
+  try {
+    const profile = await prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        companyName: true,
+        designation: true,
+      },
+    });
+
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Recruiter profile not found.' });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: profile });
+  } catch (dbError) {
+    console.error('[DB] recruiterProfile.findUnique failed:', dbError);
+    res.status(500).json({ success: false, message: 'Failed to retrieve recruiter profile.' });
+  }
+};
+
+export const updateRecruiterProfile = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId } = req.user;
+  const { companyName, designation } = req.body as {
+    companyName?: string;
+    designation?: string;
+  };
+
+  try {
+    const result = await prisma.recruiterProfile.updateMany({
+      where: { userId },
+      data: {
+        ...(companyName !== undefined && { companyName: companyName.trim() }),
+        ...(designation !== undefined && { designation: designation.trim() }),
+      },
+    });
+
+    if (result.count === 0) {
+      res.status(404).json({ success: false, message: 'Recruiter profile not found.' });
+      return;
+    }
+
+    const updated = await prisma.recruiterProfile.findUnique({
+      where: { userId },
+      select: { id: true, companyName: true, designation: true },
+    });
+
+    res.status(200).json({ success: true, message: 'Profile updated successfully.', data: updated });
+  } catch (dbError) {
+    console.error('[DB] recruiterProfile.updateMany failed:', dbError);
+    res.status(500).json({ success: false, message: 'Failed to update recruiter profile.' });
+  }
+};
