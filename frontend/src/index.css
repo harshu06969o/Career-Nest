@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+/* ============================================================
+   CareerNest — Enterprise Light Theme Design System
+   "High Trust · Extreme Readability · MAANG Grade"
+   ============================================================ */
 
 @layer base {
   *, *::before, *::after {
@@ -12,59 +17,143 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    background-color: #020617; /* slate-950 */
-    color: #f8fafc; /* slate-50 */
+    background-color: #f8fafc; /* slate-50 — enterprise page bg */
+    color: #0f172a;            /* slate-900 — maximum readability */
   }
 
   body {
     @apply font-sans antialiased;
   }
 
+  /* Light-mode scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-slate-900;
+    background: #f1f5f9; /* slate-100 */
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-700 rounded-full;
+    background: #cbd5e1; /* slate-300 */
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    background: #94a3b8; /* slate-400 */
+  }
+
+  /* Clean focus ring that works on light backgrounds */
+  :focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
   }
 }
 
 @layer utilities {
+
+  /* ── Typography gradient (Indigo → Violet on light bg) ── */
   .gradient-text {
-    background: linear-gradient(135deg, #10b981, #3b82f6, #8b5cf6);
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  .gradient-border {
-    position: relative;
+  /* ── Enterprise Card ── */
+  /* Standard white card with subtle shadow + slate-200 border */
+  .enterprise-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;   /* slate-200 */
+    border-radius: 0.75rem;       /* rounded-xl */
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, #10b981, #3b82f6);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box,
-                  linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box,
-          linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
+  .enterprise-card:hover {
+    box-shadow: 0 4px 12px 0 rgba(0,0,0,0.08), 0 2px 6px -2px rgba(0,0,0,0.05);
+    border-color: #c7d2fe; /* indigo-200 */
   }
 
-  .glow-emerald {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+  /* ── Match Score Badges ── */
+  .badge-match-high {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
+           bg-emerald-50 text-emerald-700 border border-emerald-200;
   }
-  .glow-blue {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  .badge-match-mid {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
+           bg-amber-50 text-amber-700 border border-amber-200;
   }
+  .badge-match-low {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
+           bg-red-50 text-red-700 border border-red-200;
+  }
+
+  /* ── Skill Gap Pills ── */
+  .skill-matched {
+    @apply px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-xs font-semibold;
+  }
+  .skill-missing {
+    @apply px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-md text-xs font-semibold;
+  }
+
+  /* ── Primary Button ── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-indigo-600 text-white font-semibold text-sm
+           px-5 py-2.5 rounded-lg
+           hover:bg-indigo-700 active:scale-[0.98]
+           transition-all duration-150 shadow-sm
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Ghost Button ── */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           text-slate-600 font-medium text-sm
+           px-4 py-2 rounded-lg
+           hover:bg-slate-100 hover:text-slate-900
+           transition-all duration-150;
+  }
+
+  /* ── Stat metric card (Stripe-style) ── */
+  .stat-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s ease;
+  }
+  .stat-card:hover {
+    box-shadow: 0 4px 12px 0 rgba(0,0,0,0.08);
+  }
+
+  /* ── Left-accent job card ── */
+  .job-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #4f46e5;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .job-card:hover {
+    box-shadow: 0 6px 20px 0 rgba(79,70,229,0.1);
+    border-color: #4f46e5;
+  }
+
+  /* ── Section divider line ── */
+  .section-header {
+    @apply border-b border-slate-200 pb-4 mb-6;
+  }
+
+  /* ── Skeleton loader (light mode) ── */
+  .skeleton {
+    @apply bg-slate-100 rounded animate-pulse;
+  }
+
+  /* ── Dot-grid background (hero / landing) ── */
+  .dot-grid {
+    background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
 }

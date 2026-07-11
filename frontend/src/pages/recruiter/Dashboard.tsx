@@ -11,7 +11,7 @@ import { cn } from '../../lib/cn';
 import CircularProgress from '../../components/CircularProgress';
 
 // =============================================================================
-// Types
+// Types (UNCHANGED)
 // =============================================================================
 interface Job {
   id: string;
@@ -54,6 +54,9 @@ interface RealApplicant {
  * Client-Side Filtering: The dashboard fetches only the active jobs belonging to the 
  * authenticated recruiter. "View Applicants" triggers a lazy, on-demand fetch to 
  * avoid loading heavy applicant datasets for jobs the user isn't currently inspecting.
+ * 
+ * REDESIGN: Enterprise light theme — white cards, slate borders, indigo accents.
+ * All API calls, state hooks, event handlers are UNCHANGED.
  */
 export default function RecruiterDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -240,61 +243,63 @@ export default function RecruiterDashboard() {
   const activeJobs = jobs.filter((j) => j.isActive).length;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="text-left border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-black text-slate-100">
+      <div className="section-header">
+        <h1 className="text-2xl font-black text-slate-900">
           Recruiter Dashboard
         </h1>
-        <p className="text-slate-400 mt-1 text-sm">
+        <p className="text-slate-500 mt-1 text-sm">
           Manage your job postings and review AI-scored applicants
         </p>
       </div>
 
       {/* ── Stats ─────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard
           label="Your Open Positions"
           value={activeJobs}
           icon={<Briefcase size={20} className="text-indigo-600" />}
+          iconBg="bg-indigo-50"
           sub="Your active listings only"
         />
         <StatCard
           label="Total Applications Received"
           value={totalApps}
           icon={<Users size={20} className="text-emerald-600" />}
+          iconBg="bg-emerald-50"
           sub="Across all your postings"
         />
       </div>
 
       {/* ── Post job form ─────────────────────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="enterprise-card overflow-hidden">
         <button
           onClick={() => setFormOpen((v) => !v)}
           className="w-full flex items-center justify-between px-6 py-5
-                     hover:bg-slate-950 transition-colors group"
+                     hover:bg-slate-50 transition-colors group"
         >
           <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-indigo-500/10 rounded-xl">
+            <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
               <PlusCircle size={20} className="text-indigo-600" />
             </div>
             <div className="text-left">
-              <p className="font-bold text-slate-100 text-base">Post a New Job</p>
+              <p className="font-bold text-slate-900 text-base">Post a New Job</p>
               <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
-                <Sparkles size={12} className="text-emerald-600" />
+                <Sparkles size={11} className="text-indigo-500" />
                 AI will automatically extract required skills from your description
               </p>
             </div>
           </div>
           {formOpen
-            ? <ChevronUp size={20} className="text-slate-500" />
-            : <ChevronDown size={20} className="text-slate-500" />
+            ? <ChevronUp size={18} className="text-slate-400" />
+            : <ChevronDown size={18} className="text-slate-400" />
           }
         </button>
 
         {formOpen && (
-          <div className="px-6 pb-6 border-t border-slate-800 animate-slide-up bg-slate-950">
+          <div className="px-6 pb-6 border-t border-slate-200 bg-slate-50/50 animate-slide-up">
             <form onSubmit={(e) => { void handlePost(e); }} className="space-y-5 pt-6">
               <FormField
                 label="Job Title"
@@ -304,7 +309,7 @@ export default function RecruiterDashboard() {
               />
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
                   Job Description
                 </label>
                 <textarea
@@ -313,14 +318,14 @@ export default function RecruiterDashboard() {
                   placeholder={`Describe the role, responsibilities, and requirements.\n\nExample:\nWe are looking for a React/Node.js developer with 1+ year of experience...\nRequired: React, TypeScript, MongoDB, REST APIs\nMin CGPA: 7.5`}
                   rows={6}
                   required
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
-                             text-sm text-slate-100 placeholder-gray-400 resize-y
-                             focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40
-                             transition-colors shadow-sm"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3
+                             text-sm text-slate-900 placeholder-slate-400 resize-y
+                             focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
+                             transition-colors"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Conditional Float Input Parsing */}
                 <FormField
                   label="Min CGPA (optional — leave blank for AI to decide)"
@@ -343,27 +348,27 @@ export default function RecruiterDashboard() {
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={submitting}
                   className="flex-1 flex items-center justify-center gap-2
                              bg-indigo-600 text-white
-                             font-bold py-3 rounded-xl hover:bg-indigo-700 hover:shadow-md
-                             active:scale-[0.99] transition-all duration-200
-                             disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                             font-bold py-2.5 rounded-lg hover:bg-indigo-700
+                             active:scale-[0.99] transition-all duration-150
+                             disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm"
                 >
                   {submitting
-                    ? <Loader2 size={18} className="animate-spin" />
-                    : <Sparkles size={18} />
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <Sparkles size={16} />
                   }
                   {submitting ? 'Posting & Parsing…' : 'Post Job with AI'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 bg-slate-900
-                             hover:bg-slate-950 transition-colors text-sm font-semibold shadow-sm"
+                  className="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 bg-white
+                             hover:bg-slate-50 transition-colors text-sm font-semibold"
                 >
                   Cancel
                 </button>
@@ -374,63 +379,68 @@ export default function RecruiterDashboard() {
       </div>
 
       {/* ── Job listings ─────────────────────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-            <Briefcase size={18} className="text-indigo-600" />
-            Your Postings ({jobs.length})
+      <div className="enterprise-card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <Briefcase size={16} className="text-indigo-500" />
+            Your Postings
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold border border-slate-200">
+              {jobs.length}
+            </span>
           </h2>
           <button
             onClick={() => void fetchJobs()}
             disabled={loadingJobs}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
             aria-label="Refresh"
           >
-            <RefreshCw size={16} className={loadingJobs ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={loadingJobs ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {loadingJobs ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-20 bg-slate-950 border border-slate-800 rounded-xl animate-pulse" />
+              <div key={i} className="skeleton h-20 rounded-xl" />
             ))}
           </div>
         ) : jobs.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
-            <Briefcase size={48} className="mx-auto mb-4 text-slate-600" />
-            <p className="font-semibold text-slate-100 text-lg">No jobs posted yet</p>
-            <p className="text-sm mt-1">Click "Post a New Job" above to get started</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Briefcase size={28} className="text-slate-400" />
+            </div>
+            <p className="font-semibold text-slate-800 text-base">No jobs posted yet</p>
+            <p className="text-slate-400 text-sm mt-1">Click "Post a New Job" above to get started</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-md transition-all duration-300"
+                className="border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-card-hover transition-all duration-200"
               >
                 {/* Job Header */}
-                <div className="p-6">
-                  <div className="flex items-start justify-between gap-4">
+                <div className="p-5 bg-white">
+                  <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-slate-100 text-lg truncate">{job.title}</h3>
-                      <p className="text-sm text-slate-400 mt-1 font-medium">
-                        Posted {new Date(job.createdAt).toLocaleDateString()}
+                      <h3 className="font-bold text-slate-900 text-base truncate">{job.title}</h3>
+                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                        Posted {new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                     <span className={cn(
-                      'flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold border',
+                      'flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border',
                       job.isActive
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : 'bg-slate-800 text-slate-400 border-slate-800',
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 text-slate-500 border-slate-200',
                     )}>
-                      {job.isActive ? 'Active' : 'Closed'}
+                      {job.isActive ? '● Active' : '● Closed'}
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 mt-4">
+                  <div className="flex flex-wrap gap-1.5 mb-3">
                     {job.requiredSkills.slice(0, 5).map((s) => (
-                      <span key={s} className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold rounded-md">
+                      <span key={s} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-md">
                         {s}
                       </span>
                     ))}
@@ -441,31 +451,26 @@ export default function RecruiterDashboard() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-6 mt-4 text-sm text-slate-400 border-t border-slate-800 pt-4">
-                    <span>CGPA ≥ <span className="font-bold text-slate-100">{job.minCgpa}</span></span>
-                    <span>Exp ≥ <span className="font-bold text-slate-100">{job.minExperience} yrs</span></span>
-
-
-                    <span className="font-semibold text-emerald-600">
-                      Total Applicants: {job._count?.applications ?? 0}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
+                    <span>CGPA ≥ <span className="font-bold text-slate-800">{job.minCgpa}</span></span>
+                    <span>Exp ≥ <span className="font-bold text-slate-800">{job.minExperience} yrs</span></span>
+                    <span className="font-semibold text-emerald-700">
+                      {job._count?.applications ?? 0} Applicant{(job._count?.applications ?? 0) !== 1 ? 's' : ''}
                     </span>
 
-                    <div className="ml-auto flex items-center gap-4">
-
+                    <div className="ml-auto flex items-center gap-3">
                       <button
                         onClick={() => void handleDeleteJob(job.id)}
-                        className="flex items-center gap-1.5 text-red-500 font-semibold hover:text-red-400 transition-colors"
+                        className="flex items-center gap-1 text-red-500 font-semibold hover:text-red-700 transition-colors text-xs"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={13} />
                         Delete
                       </button>
-
-
                       <button
                         onClick={() => void handleViewApplicants(job.id)}
-                        className="flex items-center gap-1.5 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+                        className="flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors text-xs"
                       >
-                        <Users size={16} />
+                        <Users size={13} />
                         {viewingApplicantsFor === job.id ? 'Hide Applicants' : 'View Applicants'}
                       </button>
                     </div>
@@ -473,14 +478,13 @@ export default function RecruiterDashboard() {
                 </div>
 
                 {/* ── Real Applicants Panel ─────────────────────────────────── */}
-                {/* Lazy-loaded Applicants List */}
                 {viewingApplicantsFor === job.id && (
-                  <div className="bg-slate-950 border-t border-slate-800 p-6 animate-slide-up">
-                    <h4 className="text-sm font-bold text-slate-100 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <Search size={16} className="text-indigo-600" />
+                  <div className="bg-slate-50 border-t border-slate-200 p-5 animate-slide-up">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Search size={13} className="text-indigo-500" />
                       AI Ranked Applicants
                       {!loadingApplicants && (
-                        <span className="ml-auto text-indigo-600 font-semibold normal-case text-sm">
+                        <span className="ml-auto text-indigo-600 font-bold normal-case text-sm">
                           {applicants.length} {applicants.length === 1 ? 'applicant' : 'applicants'}
                         </span>
                       )}
@@ -492,10 +496,12 @@ export default function RecruiterDashboard() {
                         <span className="text-sm font-medium">Loading applicants…</span>
                       </div>
                     ) : applicants.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500">
-                        <Users size={36} className="mx-auto mb-3 text-slate-600" />
-                        <p className="font-medium text-slate-400">No applications yet</p>
-                        <p className="text-sm mt-1">Students will appear here once they apply</p>
+                      <div className="text-center py-10">
+                        <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Users size={22} className="text-slate-400" />
+                        </div>
+                        <p className="font-medium text-slate-600 text-sm">No applications yet</p>
+                        <p className="text-slate-400 text-xs mt-1">Students will appear here once they apply</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -507,32 +513,33 @@ export default function RecruiterDashboard() {
                           return (
                             <div
                               key={applicant.id}
-                              className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex items-center justify-between shadow-sm hover:border-indigo-200 transition-colors"
+                              className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between
+                                         hover:border-indigo-200 hover:shadow-card transition-all duration-150"
                             >
-                              <div className="flex items-center gap-5">
+                              <div className="flex items-center gap-4">
                                 <div className="flex-shrink-0">
                                   <CircularProgress score={score} size={56} stroke={5} />
                                 </div>
                                 <div>
-                                  <p className="font-bold text-slate-100">{name}</p>
-                                  <p className="text-sm text-slate-400">
-                                    {applicant.student.college} · {applicant.student.cgpa} CGPA
+                                  <p className="font-bold text-slate-900 text-sm">{name}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {applicant.student.college} · <span className="font-semibold">{applicant.student.cgpa}</span> CGPA
                                   </p>
                                   {/* Status badge */}
                                   <span className={cn(
-                                    'inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-semibold',
+                                    'inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
                                     applicant.status === 'PENDING'
-                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                       : applicant.status === 'SHORTLISTED'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : 'bg-red-500/10 text-red-400 border border-red-500/20',
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : 'bg-red-50 text-red-700 border border-red-200',
                                   )}>
                                     {applicant.status}
                                   </span>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-3 flex-shrink-0">
+                              <div className="flex items-center gap-2 flex-shrink-0">
                                 {/* Resume Actions — only shown if student has uploaded a resume */}
                                 {/* BUG 1 PERMANENT FIX:
                                     The `download` attribute is silently ignored by all browsers
@@ -543,18 +550,20 @@ export default function RecruiterDashboard() {
                                     making the browser save it as a named PDF file — no CORS issue.
                                     ⚠️ Test ONLY with a newly uploaded resume. Old URLs may be stale. */}
                                 {applicant.student.resumeUrl ? (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5">
                                     {/* View: opens inline in new tab for quick preview */}
                                     <a
                                       href={applicant.student.resumeUrl}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="px-3 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                                      className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100
+                                                 text-xs font-semibold rounded-lg transition-colors
+                                                 flex items-center gap-1.5 border border-indigo-100"
                                       title="View resume in new tab"
                                     >
-                                      <FileText size={14} />
+                                      <FileText size={12} />
                                       View
-                                      <ExternalLink size={12} />
+                                      <ExternalLink size={10} />
                                     </a>
                                     {/* Download: fetch→Blob→createObjectURL pattern
                                         bypasses ALL cross-origin download restrictions */}
@@ -566,28 +575,31 @@ export default function RecruiterDashboard() {
                                           || applicant.student.user.email;
                                         void handleDownloadResume(applicant.student.resumeUrl!, name, applicant.id);
                                       }}
-                                      className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-sm font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100
+                                                 text-xs font-semibold rounded-lg transition-colors
+                                                 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed
+                                                 border border-emerald-100"
                                       title="Download resume as PDF"
                                     >
                                       {downloadingId === applicant.id
-                                        ? <Loader2 size={14} className="animate-spin" />
-                                        : <Download size={14} />
+                                        ? <Loader2 size={12} className="animate-spin" />
+                                        : <Download size={12} />
                                       }
-                                      {downloadingId === applicant.id ? 'Downloading…' : 'Download'}
+                                      {downloadingId === applicant.id ? 'Saving…' : 'Download'}
                                     </button>
                                   </div>
                                 ) : (
-                                  <span className="px-4 py-2 bg-slate-950 text-slate-500 text-sm rounded-lg border border-slate-800">
+                                  <span className="px-3 py-1.5 bg-slate-100 text-slate-400 text-xs rounded-lg border border-slate-200">
                                     No Resume
                                   </span>
                                 )}
                                 {/* Contact via email */}
                                 <a
                                   href={`mailto:${applicant.student.user.email}`}
-                                  className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10 rounded-lg transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                                   title={`Email ${applicant.student.user.email}`}
                                 >
-                                  <Mail size={18} />
+                                  <Mail size={16} />
                                 </a>
                               </div>
                             </div>
@@ -608,17 +620,17 @@ export default function RecruiterDashboard() {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StatCard({
-  label, value, icon, sub,
+  label, value, icon, iconBg, sub,
 }: {
-  label: string; value: number; icon: React.ReactNode; sub: string;
+  label: string; value: number; icon: React.ReactNode; iconBg: string; sub: string;
 }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="stat-card">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-slate-400 text-sm font-semibold">{label}</span>
-        <div className="p-2.5 bg-slate-950 rounded-xl">{icon}</div>
+        <span className="text-slate-500 text-sm font-medium">{label}</span>
+        <div className={cn('p-2.5 rounded-xl', iconBg)}>{icon}</div>
       </div>
-      <p className="text-4xl font-black text-slate-100">{value}</p>
+      <p className="text-4xl font-black text-slate-900">{value}</p>
       <p className="text-slate-400 text-xs mt-2 font-medium">{sub}</p>
     </div>
   );
@@ -632,7 +644,7 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
+      <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
         {label}
       </label>
       <input
@@ -643,10 +655,10 @@ function FormField({
         step={step}
         min={min}
         max={max}
-        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3
-                   text-sm text-slate-100 placeholder-gray-400
-                   focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40
-                   transition-colors shadow-sm"
+        className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5
+                   text-sm text-slate-900 placeholder-slate-400
+                   focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
+                   transition-colors"
       />
     </div>
   );

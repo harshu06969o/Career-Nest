@@ -1,13 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, GraduationCap, Briefcase } from 'lucide-react';
+import { Eye, EyeOff, Loader2, GraduationCap, Briefcase, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/axios';
 import { useAuthStore, type Role } from '../store/authStore';
 import { cn } from '../lib/cn';
 
 // =============================================================================
-// Auth Page — Login + Register with animated tab switcher
+// Auth Page — Enterprise Light Theme Login + Register
+// =============================================================================
+// REDESIGN: White card, slate-50 background, indigo accents, clean typography.
+// All form state, API calls, JWT storage, and redirects are UNCHANGED.
 // =============================================================================
 
 type Tab = 'login' | 'register';
@@ -79,24 +82,41 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background glow orbs */}
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-50 flex items-center justify-center p-4">
+      {/* Background dot grid */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-50"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #c7d2fe 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+        }}
+      />
+      {/* Soft blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-100/40 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-violet-100/30 rounded-full blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md animate-fade-in">
-        {/* Brand */}
+      <div className="w-full max-w-md animate-fade-in relative z-10">
+        {/* Brand header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black gradient-text mb-1">CareerNest</h1>
-          <p className="text-slate-400 text-sm tracking-widest uppercase">Crafted to Perfection</p>
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+              <Sparkles size={18} className="text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+              Career<span className="text-indigo-600">Nest</span>
+            </h1>
+          </div>
+          <p className="text-slate-500 text-sm font-medium">
+            {tab === 'login' ? 'Welcome back! Sign in to continue.' : 'Create your account to get started.'}
+          </p>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-card">
           {/* Tab switcher */}
-          <div className="flex bg-slate-800 rounded-xl p-1 mb-6">
+          <div className="flex bg-slate-100 rounded-xl p-1 mb-6 gap-1">
             {(['login', 'register'] as Tab[]).map((t) => (
               <button
                 key={t}
@@ -104,8 +124,8 @@ export default function Auth() {
                 className={cn(
                   'flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200',
                   tab === t
-                    ? 'bg-emerald-500 text-slate-950 shadow'
-                    : 'text-slate-400 hover:text-slate-200',
+                    ? 'bg-white text-indigo-700 shadow-sm border border-slate-200'
+                    : 'text-slate-500 hover:text-slate-700',
                 )}
               >
                 {t === 'login' ? 'Sign In' : 'Sign Up'}
@@ -127,12 +147,12 @@ export default function Auth() {
                       className={cn(
                         'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200',
                         role === r
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
-                          : 'border-slate-700 text-slate-400 hover:border-slate-600',
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white',
                       )}
                     >
                       <Icon size={22} />
-                      <span className="text-xs font-semibold">{r}</span>
+                      <span className="text-xs font-bold uppercase tracking-wide">{r}</span>
                     </button>
                   );
                 })}
@@ -162,7 +182,7 @@ export default function Auth() {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
                 Password
               </label>
               <div className="relative">
@@ -172,15 +192,15 @@ export default function Auth() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 pr-10
-                             text-sm text-slate-100 placeholder-slate-500
-                             focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40
+                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 pr-10
+                             text-sm text-slate-900 placeholder-slate-400
+                             focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
                              transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -191,16 +211,34 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 text-white font-bold
-                         py-3 rounded-xl hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]
-                         transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
-                         flex items-center justify-center gap-2 mt-2 shadow-lg"
+              className="w-full bg-indigo-600 text-white font-bold
+                         py-2.5 rounded-lg hover:bg-indigo-700 active:scale-[0.99]
+                         transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+                         flex items-center justify-center gap-2 mt-2 shadow-sm text-sm"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              {tab === 'login' ? 'Sign In' : 'Create Account'}
+              {tab === 'login' ? 'Sign In to CareerNest' : 'Create My Account'}
             </button>
           </form>
+
+          {/* Divider + switch tab hint */}
+          <div className="mt-5 text-center">
+            <p className="text-slate-500 text-sm">
+              {tab === 'login' ? "Don't have an account?" : 'Already registered?'}{' '}
+              <button
+                onClick={() => setTab(tab === 'login' ? 'register' : 'login')}
+                className="text-indigo-600 font-semibold hover:underline"
+              >
+                {tab === 'login' ? 'Sign Up' : 'Sign In'}
+              </button>
+            </p>
+          </div>
         </div>
+
+        {/* Footer note */}
+        <p className="text-center text-slate-400 text-xs mt-6">
+          By continuing, you agree to CareerNest's Terms & Privacy Policy.
+        </p>
       </div>
     </div>
   );
@@ -218,7 +256,7 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-400 mb-1 uppercase tracking-wider">
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wider">
         {label}
       </label>
       <input
@@ -227,9 +265,9 @@ function InputField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required
-        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3
-                   text-sm text-slate-100 placeholder-slate-500
-                   focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40
+        className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5
+                   text-sm text-slate-900 placeholder-slate-400
+                   focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
                    transition-colors"
       />
     </div>

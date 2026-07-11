@@ -12,6 +12,9 @@ import { cn } from '../lib/cn';
  * Global application shell component.
  * Provides the top navigation bar, responsive drawer, toast notifications, and 
  * role-based dynamic routing links (Student vs Recruiter vs Admin).
+ * 
+ * REDESIGN: Enterprise light theme — white nav, slate-200 border, indigo accents.
+ * All routing logic, auth checks, and logout behaviour are UNCHANGED.
  */
 
 interface NavLink {
@@ -31,11 +34,11 @@ export default function Layout() {
   const isAdmin     = user?.role === 'ADMIN';
 
   const navLinks: NavLink[] = isStudent
-    ? [{ label: 'Dashboard', to: '/student',         icon: <LayoutDashboard size={16} /> }]
+    ? [{ label: 'Dashboard', to: '/student',   icon: <LayoutDashboard size={15} /> }]
     : isRecruiter
-    ? [{ label: 'Dashboard', to: '/recruiter',        icon: <LayoutDashboard size={16} /> }]
+    ? [{ label: 'Dashboard', to: '/recruiter', icon: <LayoutDashboard size={15} /> }]
     : isAdmin
-    ? [{ label: 'Dashboard', to: '/admin',            icon: <LayoutDashboard size={16} /> }]
+    ? [{ label: 'Dashboard', to: '/admin',     icon: <LayoutDashboard size={15} /> }]
     : [];
 
   const handleLogout = () => {
@@ -43,38 +46,51 @@ export default function Layout() {
     navigate('/');
   };
 
+  const roleMeta = isStudent
+    ? { label: 'Student',   icon: <GraduationCap size={13} />, cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' }
+    : isRecruiter
+    ? { label: 'Recruiter', icon: <Briefcase size={13} />,     cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    : isAdmin
+    ? { label: 'Admin',     icon: <Shield size={13} />,        cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+    : null;
+
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full min-h-full flex flex-col bg-slate-50">
       {/* ── Toast provider ─────────────────────────────────────────────────── */}
       <Toaster
         position="top-center"
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#1e293b',
-            color:      '#f1f5f9',
-            border:     '1px solid #334155',
-            borderRadius: '12px',
-            fontSize:   '14px',
+            background:   '#ffffff',
+            color:        '#0f172a',
+            border:       '1px solid #e2e8f0',
+            borderRadius: '10px',
+            fontSize:     '14px',
+            fontWeight:   '500',
+            boxShadow:    '0 4px 12px rgba(0,0,0,0.08)',
           },
-          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+          success: { iconTheme: { primary: '#059669', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#dc2626', secondary: '#fff' } },
         }}
       />
 
       {/* ── Top Navigation ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 md:px-8">
-        <div className="w-full h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-8 h-16 flex items-center justify-between">
+
           {/* Left: brand */}
-          <Link to="/" className="flex flex-col items-start justify-start">
-            <span className="text-xl font-black text-emerald-400 leading-none flex items-center gap-2">
-              <SparklesIcon />
-              CareerNest
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm group-hover:bg-indigo-700 transition-colors">
+              <BrandIcon />
+            </div>
+            <span className="text-lg font-black text-slate-900 tracking-tight">
+              Career<span className="text-indigo-600">Nest</span>
             </span>
           </Link>
 
           {/* Right: nav links + actions */}
-          <div className="hidden md:flex items-center justify-end gap-3">
+          <div className="hidden md:flex items-center gap-2">
             {isAuth ? (
               <>
                 {navLinks.map((link) => (
@@ -82,30 +98,36 @@ export default function Layout() {
                     key={link.to}
                     to={link.to}
                     className={cn(
-                      'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                      'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                       location.pathname === link.to
-                        ? 'bg-slate-800 text-emerald-400'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
                     )}
                   >
                     {link.icon}
                     {link.label}
                   </Link>
                 ))}
-                <div className="h-6 w-px bg-slate-800 mx-1"></div>
-                
-                <span className="text-sm font-semibold text-slate-300 px-2 flex items-center gap-1.5">
-                  {isStudent && <><GraduationCap size={16} className="text-indigo-400"/> Student</>}
-                  {isRecruiter && <><Briefcase size={16} className="text-emerald-400"/> Recruiter</>}
-                  {isAdmin && <><Shield size={16} className="text-rose-400"/> Admin</>}
-                </span>
+
+                <div className="h-5 w-px bg-slate-200 mx-1" />
+
+                {/* Role pill badge */}
+                {roleMeta && (
+                  <span className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border',
+                    roleMeta.cls,
+                  )}>
+                    {roleMeta.icon}
+                    {roleMeta.label}
+                  </span>
+                )}
 
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
-                             text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors ml-1"
+                             text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all duration-150 ml-1"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={15} />
                   Logout
                 </button>
               </>
@@ -113,17 +135,20 @@ export default function Layout() {
               <>
                 <Link
                   to="/auth"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium
+                             text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150"
                 >
-                  <LogIn size={16} />
+                  <LogIn size={15} />
                   Login
                 </Link>
                 <Link
                   to="/auth"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-sm transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold
+                             bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm
+                             transition-all duration-150 active:scale-[0.98]"
                 >
-                  <UserPlus size={16} />
-                  Register
+                  <UserPlus size={15} />
+                  Get Started
                 </Link>
               </>
             )}
@@ -131,7 +156,7 @@ export default function Layout() {
 
           {/* Mobile: hamburger */}
           <button
-            className="md:hidden p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800"
+            className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Toggle menu"
           >
@@ -141,7 +166,7 @@ export default function Layout() {
 
         {/* Mobile drawer */}
         {menuOpen && (
-          <div className="md:hidden border-t border-slate-800 py-4 flex flex-col gap-2 animate-slide-up bg-slate-950">
+          <div className="md:hidden border-t border-slate-200 bg-white py-3 flex flex-col gap-1 animate-slide-up px-4 shadow-md">
             {isAuth ? (
               <>
                 {navLinks.map((link) => (
@@ -152,40 +177,56 @@ export default function Layout() {
                     className={cn(
                       'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
                       location.pathname === link.to
-                        ? 'bg-slate-800 text-emerald-400'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50',
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
                     )}
                   >
                     {link.icon}
                     {link.label}
                   </Link>
                 ))}
+
+                {/* Role badge in mobile */}
+                {roleMeta && (
+                  <div className={cn(
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border w-fit ml-4 mt-1',
+                    roleMeta.cls,
+                  )}>
+                    {roleMeta.icon}
+                    {roleMeta.label}
+                  </div>
+                )}
+
+                <div className="h-px bg-slate-200 my-2" />
+
                 <button
                   onClick={() => { setMenuOpen(false); handleLogout(); }}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
-                             text-red-400 hover:bg-red-500/10 transition-colors mt-2"
+                             text-red-600 hover:bg-red-50 transition-colors"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={15} />
                   Logout
                 </button>
               </>
             ) : (
-              <div className="flex flex-col gap-2 px-4">
+              <div className="flex flex-col gap-2">
                 <Link
                   to="/auth"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium
+                             text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
-                  <LogIn size={16} />
+                  <LogIn size={15} />
                   Login
                 </Link>
                 <Link
                   to="/auth"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-sm transition-colors"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-semibold
+                             bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition-colors"
                 >
-                  <UserPlus size={16} />
-                  Register
+                  <UserPlus size={15} />
+                  Get Started
                 </Link>
               </div>
             )}
@@ -194,16 +235,20 @@ export default function Layout() {
       </header>
 
       {/* ── Page content ───────────────────────────────────────────────────── */}
-      <main className="flex-1 w-full px-4 md:px-8 py-8">
-        <Outlet />
+      <main className="flex-1 w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
 }
 
-function SparklesIcon() {
+/** Minimal nest/briefcase icon for brand mark */
+function BrandIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-sparkles">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+         fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
     </svg>
   );

@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Users, Briefcase, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { Users, Briefcase, FileText, Loader2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
 import { cn } from '../../lib/cn';
 
 // =============================================================================
-// Types
+// Types (UNCHANGED)
 // =============================================================================
 interface Job {
   id:             string;
@@ -21,6 +21,8 @@ interface Job {
 
 // =============================================================================
 // Admin Dashboard
+// REDESIGN: Stripe-style metric cards, clean data table, enterprise light theme.
+// All API calls, state, and hooks UNCHANGED.
 // =============================================================================
 export default function AdminDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -45,146 +47,170 @@ export default function AdminDashboard() {
   // Mocked stats as requested
   const stats = [
     {
-      label: 'Total Registered Students',
-      value: '1,245',
-      icon: <Users size={20} className="text-indigo-400" />,
-      sub: '+12% from last month',
+      label:   'Total Registered Students',
+      value:   '1,245',
+      trend:   '+12%',
+      trendUp: true,
+      icon:    <Users size={20} className="text-indigo-600" />,
+      iconBg:  'bg-indigo-50',
+      sub:     'from last month',
     },
     {
-      label: 'Active Job Postings',
-      value: jobs.filter((j) => j.isActive).length.toString(),
-      icon: <Briefcase size={20} className="text-emerald-400" />,
-      sub: 'Across all recruiters',
+      label:   'Active Job Postings',
+      value:   jobs.filter((j) => j.isActive).length.toString(),
+      trend:   'Live now',
+      trendUp: true,
+      icon:    <Briefcase size={20} className="text-emerald-600" />,
+      iconBg:  'bg-emerald-50',
+      sub:     'across all recruiters',
     },
     {
-      label: 'Total Applications Processed',
-      value: '8,432',
-      icon: <FileText size={20} className="text-rose-400" />,
-      sub: '+24% from last month',
+      label:   'Total Applications Processed',
+      value:   '8,432',
+      trend:   '+24%',
+      trendUp: true,
+      icon:    <FileText size={20} className="text-violet-600" />,
+      iconBg:  'bg-violet-50',
+      sub:     'from last month',
     },
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in w-full">
+    <div className="space-y-6 animate-fade-in w-full">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="text-left mb-8 border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-black text-slate-100">
+      <div className="section-header">
+        <h1 className="text-2xl font-black text-slate-900">
           Admin Dashboard
         </h1>
-        <p className="text-slate-400 mt-1 text-sm">
-          Placement Cell System Overview and Activity Monitoring
+        <p className="text-slate-500 mt-1 text-sm">
+          Placement Cell · System Overview and Activity Monitoring
         </p>
       </div>
 
-      {/* ── Stats grid — 3 cols ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map(({ label, value, icon, sub }) => (
-          <div
-            key={label}
-            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-slate-400 text-sm font-medium">{label}</span>
-              <div className="p-2 bg-slate-800/50 rounded-lg">{icon}</div>
+      {/* ── Stripe-style Stats grid — 3 cols ──────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {stats.map(({ label, value, trend, trendUp, icon, iconBg, sub }) => (
+          <div key={label} className="stat-card">
+            <div className="flex items-start justify-between mb-4">
+              <div className={cn('p-2.5 rounded-xl', iconBg)}>
+                {icon}
+              </div>
+              <span className={cn(
+                'flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full',
+                trendUp
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-red-50 text-red-700 border border-red-200',
+              )}>
+                {trendUp
+                  ? <TrendingUp size={11} />
+                  : <TrendingDown size={11} />
+                }
+                {trend}
+              </span>
             </div>
-            <p className="text-3xl font-black text-slate-100">{value}</p>
-            <p className="text-slate-500 text-xs mt-2">{sub}</p>
+            <p className="text-4xl font-black text-slate-900 tabular-nums">{value}</p>
+            <div className="mt-2 flex flex-col">
+              <p className="text-slate-500 text-xs font-medium">{label}</p>
+              <p className="text-slate-400 text-xs mt-0.5">{sub}</p>
+            </div>
           </div>
         ))}
       </div>
 
       {/* ── System Activity Table ────────────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden mt-8">
-        <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900">
-          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-            <Briefcase size={18} className="text-indigo-400" />
-            System Activity — Recent Jobs
+      <div className="enterprise-card overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+          <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <Briefcase size={15} className="text-indigo-500" />
+            System Activity — Recent Job Postings
           </h2>
           <button
             onClick={() => void fetchJobs()}
             disabled={loading}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
             aria-label="Refresh"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
 
-        <div className="overflow-x-auto p-6">
-          <table className="w-full text-sm text-left border-collapse border border-slate-800">
-            <thead className="bg-slate-800 text-slate-300 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Job Title</th>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Company / Recruiter</th>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Required Skills</th>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Applicants</th>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Status</th>
-                <th className="px-6 py-4 font-semibold border-b border-slate-700">Date Posted</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Job Title</th>
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Company / Recruiter</th>
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Required Skills</th>
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Applicants</th>
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Date Posted</th>
               </tr>
             </thead>
-            <tbody className="bg-slate-900 divide-y divide-slate-800">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 border border-slate-800">
-                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-400" />
-                    Loading system activity...
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-500" />
+                    <p className="text-slate-400 text-sm font-medium">Loading system activity...</p>
                   </td>
                 </tr>
               ) : jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 border border-slate-800">
-                    <Briefcase size={32} className="mx-auto mb-3 text-slate-700" />
-                    <p className="font-medium text-slate-400">No active jobs in the system.</p>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Briefcase size={22} className="text-slate-400" />
+                    </div>
+                    <p className="font-medium text-slate-700 text-sm">No active jobs in the system.</p>
                   </td>
                 </tr>
               ) : (
                 jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap border-b border-slate-800">
-                      <p className="font-semibold text-slate-200">{job.title}</p>
+                  <tr key={job.id} className="hover:bg-slate-50/70 transition-colors bg-white">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <p className="font-semibold text-slate-900 text-sm">{job.title}</p>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-400 border-b border-slate-800">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       {job.recruiter?.recruiterProfile ? (
                         <>
-                          <span className="font-medium text-slate-200">
+                          <span className="font-semibold text-slate-800 text-sm">
                             {job.recruiter.recruiterProfile.companyName}
                           </span>
-                          <span className="text-slate-500 ml-1 block text-xs">
+                          <span className="text-slate-400 block text-xs mt-0.5">
                             {job.recruiter.recruiterProfile.designation}
                           </span>
                         </>
                       ) : (
-                        <span className="text-slate-600 italic">Unknown</span>
+                        <span className="text-slate-400 italic text-sm">Unknown</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 border-b border-slate-800">
-                      <div className="flex flex-wrap gap-1.5">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
                         {job.requiredSkills.slice(0, 3).map((s) => (
-                          <span key={s} className="px-2 py-0.5 bg-slate-800 text-slate-300 text-[11px] rounded-md font-medium border border-slate-700">
+                          <span key={s} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[11px] rounded-md font-semibold border border-indigo-100">
                             {s}
                           </span>
                         ))}
                         {job.requiredSkills.length > 3 && (
-                          <span className="px-2 py-0.5 text-slate-500 text-[11px] font-medium">
+                          <span className="text-slate-400 text-[11px] font-medium self-center">
                             +{job.requiredSkills.length - 3}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap border-b border-slate-800 text-slate-300 font-semibold">
-                      {job._count?.applications ?? 0}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="font-bold text-slate-900 text-sm">{job._count?.applications ?? 0}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap border-b border-slate-800">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={cn(
-                        'px-2.5 py-1 rounded-full text-xs font-semibold',
+                        'px-2.5 py-1 rounded-full text-xs font-bold border',
                         job.isActive
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700',
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-500 border-slate-200',
                       )}>
-                        {job.isActive ? 'Active' : 'Closed'}
+                        {job.isActive ? '● Active' : '● Closed'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500 text-xs border-b border-slate-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-slate-400 text-xs font-medium">
                       {new Date(job.createdAt).toLocaleDateString(undefined, {
                         month: 'short', day: 'numeric', year: 'numeric'
                       })}
