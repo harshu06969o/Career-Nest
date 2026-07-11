@@ -22,11 +22,30 @@ const SALT_ROUNDS = 12; // bcrypt work factor — 12 is the production sweet spo
  * on MongoDB, ensuring compatibility across both local standalone databases and cloud environments.
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
-  const { email, password, role, adminSecret } = req.body as {
+  const {
+    email,
+    password,
+    role,
+    adminSecret,
+    // Student-specific fields sent from Auth.tsx registration form
+    firstName,
+    lastName,
+    college,
+    cgpa,
+    // Recruiter-specific fields
+    companyName,
+    designation,
+  } = req.body as {
     email?: string;
     password?: string;
     role?: string;
     adminSecret?: string;
+    firstName?: string;
+    lastName?: string;
+    college?: string;
+    cgpa?: number;
+    companyName?: string;
+    designation?: string;
   };
 
   if (!email || !password || !role) {
@@ -75,23 +94,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     try {
       if (role === 'STUDENT') {
+        // Parse and validate CGPA — must be 0.0–10.0; default to 0 if absent/invalid
+        const parsedCgpa = parseFloat(String(cgpa ?? ''));
+        const safeCgpa   = (!isNaN(parsedCgpa) && parsedCgpa >= 0 && parsedCgpa <= 10)
+          ? parsedCgpa
+          : 0;
+
         await prisma.studentProfile.create({
           data: {
-            userId: user.id,
-            firstName: '',
-            lastName: '',
-            college: '',
-            parsedSkills: [],
-            cgpa: 0,
+            userId:          user.id,
+            firstName:       typeof firstName === 'string' ? firstName.trim() : '',
+            lastName:        typeof lastName  === 'string' ? lastName.trim()  : '',
+            college:         typeof college   === 'string' ? college.trim()   : '',
+            parsedSkills:    [],
+            cgpa:            safeCgpa,
             experienceYears: 0,
           },
         });
       } else if (role === 'RECRUITER') {
         await prisma.recruiterProfile.create({
           data: {
-            userId: user.id,
-            companyName: '',
-            designation: '',
+            userId:      user.id,
+            companyName: typeof companyName === 'string' ? companyName.trim() : '',
+            designation: typeof designation  === 'string' ? designation.trim()  : '',
           },
         });
       }

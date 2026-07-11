@@ -22,11 +22,20 @@ interface Job {
 // =============================================================================
 // Admin Dashboard
 // REDESIGN: Stripe-style metric cards, clean data table, enterprise light theme.
-// All API calls, state, and hooks UNCHANGED.
+// Stats are now fetched in real-time from /api/jobs/admin-stats.
 // =============================================================================
+
+interface AdminStats {
+  totalStudents:      number;
+  totalApplications:  number;
+  activeJobCount:     number;
+}
+
 export default function AdminDashboard() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [jobs,       setJobs]       = useState<Job[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -40,40 +49,57 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const { data } = await api.get<{ data: AdminStats }>('/jobs/admin-stats');
+      setAdminStats(data.data);
+    } catch {
+      toast.error('Failed to load platform statistics.');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const handleRefreshAll = useCallback(async () => {
+    await Promise.all([fetchJobs(), fetchStats()]);
+  }, [fetchJobs, fetchStats]);
+
   useEffect(() => {
     void fetchJobs();
-  }, [fetchJobs]);
+    void fetchStats();
+  }, [fetchJobs, fetchStats]);
 
-  // Mocked stats as requested
   const stats = [
     {
       label:   'Total Registered Students',
-      value:   '1,245',
-      trend:   '+12%',
+      value:   statsLoading ? '…' : (adminStats?.totalStudents ?? 0).toLocaleString(),
+      trend:   'All time',
       trendUp: true,
       icon:    <Users size={20} className="text-indigo-600" />,
       iconBg:  'bg-indigo-50',
-      sub:     'from last month',
+      sub:     'Registered on platform',
     },
     {
       label:   'Active Job Postings',
-      value:   jobs.filter((j) => j.isActive).length.toString(),
+      value:   statsLoading ? '…' : (adminStats?.activeJobCount ?? 0).toLocaleString(),
       trend:   'Live now',
       trendUp: true,
       icon:    <Briefcase size={20} className="text-emerald-600" />,
       iconBg:  'bg-emerald-50',
-      sub:     'across all recruiters',
+      sub:     'Across all recruiters',
     },
     {
       label:   'Total Applications Processed',
-      value:   '8,432',
-      trend:   '+24%',
+      value:   statsLoading ? '…' : (adminStats?.totalApplications ?? 0).toLocaleString(),
+      trend:   'All time',
       trendUp: true,
       icon:    <FileText size={20} className="text-violet-600" />,
       iconBg:  'bg-violet-50',
-      sub:     'from last month',
+      sub:     'Submitted by students',
     },
   ];
+
 
   return (
     <div className="space-y-6 animate-fade-in w-full">
@@ -89,32 +115,46 @@ export default function AdminDashboard() {
 
       {/* ── Stripe-style Stats grid — 3 cols ──────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map(({ label, value, trend, trendUp, icon, iconBg, sub }) => (
-          <div key={label} className="stat-card">
-            <div className="flex items-start justify-between mb-4">
-              <div className={cn('p-2.5 rounded-xl', iconBg)}>
-                {icon}
+        {statsLoading ? (
+          // Skeleton cards while stats load
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="stat-card animate-pulse">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-10 h-10 bg-slate-200 rounded-xl" />
+                <div className="w-16 h-5 bg-slate-200 rounded-full" />
               </div>
-              <span className={cn(
-                'flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full',
-                trendUp
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-red-50 text-red-700 border border-red-200',
-              )}>
-                {trendUp
-                  ? <TrendingUp size={11} />
-                  : <TrendingDown size={11} />
-                }
-                {trend}
-              </span>
+              <div className="w-20 h-9 bg-slate-200 rounded-lg mb-2" />
+              <div className="w-32 h-3 bg-slate-100 rounded" />
             </div>
-            <p className="text-4xl font-black text-slate-900 tabular-nums">{value}</p>
-            <div className="mt-2 flex flex-col">
-              <p className="text-slate-500 text-xs font-medium">{label}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{sub}</p>
+          ))
+        ) : (
+          stats.map(({ label, value, trend, trendUp, icon, iconBg, sub }) => (
+            <div key={label} className="stat-card">
+              <div className="flex items-start justify-between mb-4">
+                <div className={cn('p-2.5 rounded-xl', iconBg)}>
+                  {icon}
+                </div>
+                <span className={cn(
+                  'flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full',
+                  trendUp
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-red-50 text-red-700 border border-red-200',
+                )}>
+                  {trendUp
+                    ? <TrendingUp size={11} />
+                    : <TrendingDown size={11} />
+                  }
+                  {trend}
+                </span>
+              </div>
+              <p className="text-4xl font-black text-slate-900 tabular-nums">{value}</p>
+              <div className="mt-2 flex flex-col">
+                <p className="text-slate-500 text-xs font-medium">{label}</p>
+                <p className="text-slate-400 text-xs mt-0.5">{sub}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* ── System Activity Table ────────────────────────────────────────── */}
@@ -125,12 +165,12 @@ export default function AdminDashboard() {
             System Activity — Recent Job Postings
           </h2>
           <button
-            onClick={() => void fetchJobs()}
-            disabled={loading}
+            onClick={() => void handleRefreshAll()}
+            disabled={loading || statsLoading}
             className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-            aria-label="Refresh"
+            aria-label="Refresh all"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={(loading || statsLoading) ? 'animate-spin' : ''} />
           </button>
         </div>
 

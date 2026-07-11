@@ -3,9 +3,10 @@ import { verifyToken, requireRole } from '../middlewares/auth.middleware.js';
 import {
   createJob,
   getAllJobs,
-  getMyJobs,         // BUG FIX (Bug 1): recruiter-scoped jobs only
-  getJobApplicants,  // BUG FIX (Bug 3): real applicants — replaces mock data
+  getMyJobs,
+  getJobApplicants,
   deleteJob,
+  getAdminStats,   // Real-time platform stats for Admin Dashboard
 } from '../controllers/job.controller.js';
 
 const router = Router();
@@ -57,6 +58,24 @@ router.get(
   verifyToken,
   requireRole(['RECRUITER', 'ADMIN']),
   getMyJobs,
+);
+
+// =============================================================================
+// GET /api/jobs/admin-stats
+// =============================================================================
+// Returns real-time platform counts: total students, total applications,
+// and active job count. Admin-only. No caching — always fresh from MongoDB.
+//
+// ⚠ ROUTE ORDER CRITICAL: Must appear BEFORE /:jobId and /:id param routes
+//   so Express matches the literal string "admin-stats" here, not as a jobId.
+//
+// Security chain: verifyToken → requireRole(['ADMIN']) → getAdminStats
+// =============================================================================
+router.get(
+  '/admin-stats',
+  verifyToken,
+  requireRole(['ADMIN']),
+  getAdminStats,
 );
 
 // =============================================================================

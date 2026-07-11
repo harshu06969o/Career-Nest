@@ -165,7 +165,58 @@ ABSOLUTE RULES:
 5. cgpa: extract CGPA or Cumulative GPA on a 10-point scale. Convert 4-point scales to 10-point proportionally.
 6. college: extract the name of the most recent university or college.
 7. If a field cannot be determined, return its empty default ([] for arrays, 0.0 for numbers, "" for strings).
-8. Never hallucinate skills or experience that are not present in the text.`;
+8. Never hallucinate skills or experience that are not present in the text.
+9. ACRONYM EXPANSION (CRITICAL): Always expand well-known tech acronyms to their full canonical lowercase form AND include the expansion in skills. Examples:
+   - "DSA" → "data structures and algorithms"
+   - "OOP" or "OOPS" → "object-oriented programming"
+   - "OS" → "operating system"
+   - "DBMS" → "database management system"
+   - "CN" or "Computer Networks" → "computer networks"
+   - "ML" → "machine learning"
+   - "DL" → "deep learning"
+   - "AI" → "artificial intelligence"
+   - "NLP" → "natural language processing"
+   - "CV" (in tech context) → "computer vision"
+   - "CI/CD" or "CICD" → "ci cd"
+   - "REST API", "RESTful", "restAPI", "REST APIs" → "rest api"
+   - "GraphQL API" → "graphql"
+   - "ORM" → "orm"
+   - "MVC" → "mvc"
+   - "JS" → "javascript"
+   - "TS" → "typescript"
+   - "PY" → "python"
+   - "STL" → "standard template library"
+   - "SDLC" → "software development lifecycle"
+   - "AWS" → "aws" (keep as-is, already canonical)
+   - "GCP" → "google cloud platform"
+   - "k8s" or "K8s" → "kubernetes"
+10. NORMALIZATION: Normalize all skill variant spellings to a single canonical lowercase form:
+   - "Node.js", "NodeJS", "node js" → "node.js"
+   - "ReactJS", "React.js", "React" → "react"
+   - "VueJS", "Vue.js" → "vue.js"
+   - "AngularJS", "Angular" → "angular"
+   - "PostgreSQL", "Postgres" → "postgresql"
+   - "MongoDB", "Mongo" → "mongodb"
+   - "TensorFlow", "Tensorflow" → "tensorflow"
+   - "PyTorch", "pytorch" → "pytorch"
+   - "scikit-learn", "sklearn" → "scikit-learn"
+11. CONTEXT-AWARE EXTRACTION (CRITICAL): Extract implied skills from EVERY sentence in the resume — not just the "Skills" or "Technical Skills" section. Achievement statements, project bullets, and experience descriptions ALL contain skills. Examples of what to extract:
+   - "Solved 650+ DSA problems on LeetCode" → extract "data structures and algorithms"
+   - "Solved 500+ problems on LeetCode/Codeforces" → extract "data structures and algorithms", "competitive programming"
+   - "Built and deployed REST API endpoints" → extract "rest api"
+   - "Developed RESTful web services" → extract "rest api"
+   - "Implemented CRUD operations using Node.js" → extract "node.js", "rest api"
+   - "Applied OOP principles in Java" → extract "object-oriented programming", "java"
+   - "Optimized SQL queries reducing latency by 40%" → extract "sql"
+   - "Containerized the application using Docker" → extract "docker"
+   - "Deployed on AWS EC2" → extract "aws"
+   - "Used Git for version control" → extract "git"
+   - "Designed database schema in MongoDB" → extract "mongodb"
+   - "Experience with Agile/Scrum methodology" → extract "agile", "scrum"
+   - "Knowledge of DBMS concepts" → extract "database management system"
+   - "Familiar with OS scheduling and memory management" → extract "operating system"
+   - "Studied Computer Networks including TCP/IP" → extract "computer networks"
+   RULE: If ANY part of a sentence references a skill, tool, or technology — even indirectly — extract it. Do NOT miss skills just because they appear in achievement or experience lines.`;
 
 /**
  * Processes unstructured resume text through the Gemini LLM API to extract a structured schema.
@@ -285,15 +336,33 @@ const JOB_RESPONSE_SCHEMA = {
   required: ['requiredSkills', 'minCgpa', 'minExperience'],
 };
 
-const JOB_SYSTEM_INSTRUCTION = `You are an immutable, stateless job-description-to-JSON compiler. Extract hiring requirements from job posting text.
+const JOB_SYSTEM_INSTRUCTION = `You are a senior technical recruiter and a stateless job-description-to-JSON compiler. Think like a hiring manager with 10+ years of experience. Extract ALL hiring requirements — both explicit and strongly implied — from the job posting.
 
 ABSOLUTE RULES:
 1. Respond with ONLY a single valid JSON object. Zero markdown, zero code fences, zero prose. DO NOT output conversational text like "Here is the JSON requested".
-2. requiredSkills: extract all technical skills, tools, languages, and frameworks. Normalize ALL to lowercase.
-3. minCgpa: extract minimum GPA on a 10-point scale. Convert 4.0-scale values proportionally (3.5/4.0 → 8.75/10). Use 0.0 if not stated.
-4. minExperience: extract minimum years of experience as a decimal float. Use 0.0 for freshers or internship roles.
-5. If a field cannot be determined, use its zero default ([] or 0.0).
-6. Never hallucinate requirements not present in the job description.`;
+2. requiredSkills: Extract ALL technical skills — explicit AND implied. Normalize ALL to lowercase canonical form. Think like a recruiter: if the JD says "Backend developer with Node.js", it implies javascript, node.js, rest api, express. If it says "Full Stack React role", it implies react, javascript, html, css, rest api. If it says "Data Science role", it implies python, machine learning, sql, pandas, numpy.
+3. ACRONYM EXPANSION (CRITICAL): Expand all tech acronyms to their canonical lowercase form:
+   - "DSA" → "data structures and algorithms"
+   - "OOP" or "OOPS" → "object-oriented programming"
+   - "REST API", "RESTful", "restAPI", "REST APIs", "Restful APIs" → "rest api"
+   - "ML" → "machine learning"
+   - "DL" → "deep learning"
+   - "AI" → "artificial intelligence"
+   - "NLP" → "natural language processing"
+   - "CI/CD" or "CICD" → "ci cd"
+   - "DBMS" → "database management system"
+   - "OS" → "operating system"
+   - "k8s" or "K8s" → "kubernetes"
+   - "GCP" → "google cloud platform"
+4. NORMALIZATION: Normalize all variant spellings to canonical lowercase:
+   - "Node.js", "NodeJS", "node js" → "node.js"
+   - "ReactJS", "React.js", "React" → "react"
+   - "PostgreSQL", "Postgres" → "postgresql"
+   - "MongoDB", "Mongo" → "mongodb"
+5. minCgpa: extract minimum GPA on a 10-point scale. Convert 4.0-scale values proportionally (3.5/4.0 → 8.75/10). Use 0.0 if not stated.
+6. minExperience: extract minimum years of experience as a decimal float. Use 0.0 for freshers or internship roles.
+7. If a field cannot be determined, use its zero default ([] or 0.0).
+8. Never hallucinate requirements that are NOT mentioned or strongly implied by the job description.`;
 
 /**
  * Processes unstructured job description text to extract hiring requirements.

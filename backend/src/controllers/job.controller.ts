@@ -427,3 +427,38 @@ export const deleteJob = async (req: Request, res: Response): Promise<void> => {
 };
 
 
+// =============================================================================
+// getAdminStats
+// =============================================================================
+// GET /api/jobs/admin-stats
+//
+// Returns real-time platform-wide counts for the Admin Dashboard.
+// Runs 3 parallel Prisma queries using Promise.all for efficiency.
+// No caching — admin stats are always served fresh from MongoDB.
+// =============================================================================
+export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  try {
+    const [totalStudents, totalApplications, activeJobCount] = await Promise.all([
+      prisma.studentProfile.count(),
+      prisma.application.count(),
+      prisma.job.count({ where: { isActive: true } }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalStudents,
+        totalApplications,
+        activeJobCount,
+      },
+    });
+  } catch (dbError) {
+    console.error('[DB] getAdminStats failed:', dbError);
+    res.status(500).json({ success: false, message: 'Failed to fetch admin statistics.' });
+  }
+};

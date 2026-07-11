@@ -70,6 +70,8 @@ export default function RecruiterDashboard() {
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   // Tracks which applicant's resume is currently being downloaded (shows spinner)
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // Tracks which applicant's resume is currently being viewed (shows spinner on View btn)
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
 
   const [title, setTitle] = useState('');
@@ -236,6 +238,47 @@ export default function RecruiterDashboard() {
       toast.error('Failed to download resume. Please try again.');
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  // ===========================================================================
+  // handleViewResume — Blob-based PDF Preview in New Tab
+  // ===========================================================================
+  // WHY NOT a plain <a href target="_blank">:
+  //   Resumes are stored as resource_type:"raw" on Cloudinary. Cloudinary serves
+  //   raw resources with Content-Type: application/octet-stream, NOT application/pdf.
+  //   The browser sees octet-stream and renders the raw binary as garbled text
+  //   instead of opening the built-in PDF viewer.
+  //
+  // THE FIX — same fetch → Blob → createObjectURL pattern as Download:
+  //   1. Fetch the raw PDF bytes (plain fetch, no axios, avoids JWT 401 on Cloudinary).
+  //   2. Wrap bytes in a new Blob({ type: 'application/pdf' }) to force MIME type.
+  //   3. Create a local blob:// URL — the browser's PDF viewer opens blob:// URLs
+  //      correctly regardless of what Content-Type the remote server sent.
+  //   4. Open the blob URL in a new tab.
+  //   NOTE: We do NOT revoke the blob URL immediately — the new tab needs it alive
+  //   while the PDF is rendering. The browser will release the memory when the tab closes.
+  // ===========================================================================
+  const handleViewResume = async (resumeUrl: string, applicantId: string) => {
+    setViewingId(applicantId);
+    try {
+      const response = await fetch(resumeUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch resume: ${response.status} ${response.statusText}`);
+      }
+
+      // Force application/pdf MIME type so the browser's PDF viewer opens it
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      // Open in new tab — blob:// URLs always trigger the PDF viewer
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('[View] Resume fetch failed:', err);
+      toast.error('Failed to open resume. Please try again.');
+    } finally {
+      setViewingId(null);
     }
   };
 
@@ -538,34 +581,31 @@ export default function RecruiterDashboard() {
                                   </span>
                                 </div>
                               </div>
-
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {/* Resume Actions — only shown if student has uploaded a resume */}
-                                {/* BUG 1 PERMANENT FIX:
-                                    The `download` attribute is silently ignored by all browsers
-                                    for cross-origin URLs (Cloudinary is on a different domain).
-                                    Strategy: handleDownloadResume() injects `fl_attachment` directly
-                                    into the Cloudinary CDN URL path. This forces Cloudinary's server
-                                    to respond with Content-Disposition: attachment headers,
-                                    making the browser save it as a named PDF file — no CORS issue.
-                                    ⚠️ Test ONLY with a newly uploaded resume. Old URLs may be stale. */}
                                 {applicant.student.resumeUrl ? (
                                   <div className="flex items-center gap-1.5">
-                                    {/* View: opens inline in new tab for quick preview */}
-                                    <a
-                                      href={applicant.student.resumeUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100
-                                                 text-xs font-semibold rounded-lg transition-colors
-                                                 flex items-center gap-1.5 border border-indigo-100"
-                                      title="View resume in new tab"
-                                    >
-                                      <FileText size={12} />
-                                      View
-                                      <ExternalLink size={10} />
-                                    </a>
-                                    {/* Download: fetch→Blob→createObjectURL pattern
+                                     {/* View: fetch→Blob→window.open so browser PDF viewer
+                                         opens correctly even for Cloudinary raw resources
+                                         (plain <a href> shows garbled binary text because
+                                          Cloudinary serves raw files as octet-stream) */}
+                                     <button
+                                       type="button"
+                                       disabled={viewingId === applicant.id}
+                                       onClick={() => void handleViewResume(applicant.student.resumeUrl!, applicant.id)}
+                                       className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100
+                                                  text-xs font-semibold rounded-lg transition-colors
+                                                  flex items-center gap-1.5 border border-indigo-100
+                                                  disabled:opacity-50 disabled:cursor-not-allowed"
+                                       title="View resume in new tab"
+                                     >
+                                       {viewingId === applicant.id
+                                         ? <Loader2 size={12} className="animate-spin" />
+                                         : <FileText size={12} />}
+                                       {viewingId === applicant.id ? 'Opening…' : 'View'}
+                                       {viewingId !== applicant.id && <ExternalLink size={10} />}
+                                     </button>
+                                     {/* Download: fetch→Blob→createObjectURL pattern
                                         bypasses ALL cross-origin download restrictions */}
                                     <button
                                       type="button"

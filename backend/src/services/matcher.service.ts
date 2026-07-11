@@ -19,6 +19,94 @@ export interface JobMatchInput {
 }
 
 // =============================================================================
+// Skill Alias Normalization Map
+// =============================================================================
+// Maps every known variant/acronym/shorthand to a single canonical lowercase
+// form. Applied to BOTH student skills and job required skills before the
+// set-intersection step so "dsa" == "data structures and algorithms" etc.
+// Add new entries here as new aliases are discovered — no LLM changes needed.
+// =============================================================================
+const SKILL_ALIASES: Record<string, string> = {
+  // Acronyms → Full form
+  'dsa':                              'data structures and algorithms',
+  'data structures':                  'data structures and algorithms',
+  'data structure':                   'data structures and algorithms',
+  'algorithms':                       'data structures and algorithms',
+  'ds & algorithms':                  'data structures and algorithms',
+  'oop':                              'object-oriented programming',
+  'oops':                             'object-oriented programming',
+  'object oriented programming':      'object-oriented programming',
+  'object-oriented':                  'object-oriented programming',
+  'os':                               'operating system',
+  'operating systems':                'operating system',
+  'dbms':                             'database management system',
+  'database management':              'database management system',
+  'cn':                               'computer networks',
+  'computer networking':              'computer networks',
+  'networking':                       'computer networks',
+  'ml':                               'machine learning',
+  'dl':                               'deep learning',
+  'ai':                               'artificial intelligence',
+  'nlp':                              'natural language processing',
+  'cv':                               'computer vision',
+  'computer-vision':                  'computer vision',
+  'cicd':                             'ci cd',
+  'ci/cd':                            'ci cd',
+  'sdlc':                             'software development lifecycle',
+  'stl':                              'standard template library',
+  'orm':                              'orm',
+  'mvc':                              'mvc',
+  // REST API variants
+  'restapi':                          'rest api',
+  'rest apis':                        'rest api',
+  'restful':                          'rest api',
+  'restful api':                      'rest api',
+  'restful apis':                     'rest api',
+  'rest':                             'rest api',
+  'api':                              'rest api',
+  // Language shorthands
+  'js':                               'javascript',
+  'ts':                               'typescript',
+  // Framework/Library normalizations
+  'reactjs':                          'react',
+  'react.js':                         'react',
+  'vuejs':                            'vue.js',
+  'vue':                              'vue.js',
+  'angularjs':                        'angular',
+  'nodejs':                           'node.js',
+  'node js':                          'node.js',
+  'nextjs':                           'next.js',
+  'next js':                          'next.js',
+  'expressjs':                        'express',
+  'express.js':                       'express',
+  // Database normalizations
+  'postgres':                         'postgresql',
+  'mongo':                            'mongodb',
+  'mysql server':                     'mysql',
+  // Cloud/DevOps
+  'gcp':                              'google cloud platform',
+  'google cloud':                     'google cloud platform',
+  'k8s':                              'kubernetes',
+  'kube':                             'kubernetes',
+  // ML/Data Science
+  'sklearn':                          'scikit-learn',
+  'scikit learn':                     'scikit-learn',
+  'tensorflow':                       'tensorflow',
+  'tf':                               'tensorflow',
+  'pytorch':                          'pytorch',
+  'torch':                            'pytorch',
+};
+
+/**
+ * Normalizes a skill string to its canonical lowercase form using the alias map.
+ * Falls back to the already-lowercased trimmed value if no alias is found.
+ */
+function normalizeSkill(s: string): string {
+  const lower = s.toLowerCase().trim();
+  return SKILL_ALIASES[lower] ?? lower;
+}
+
+// =============================================================================
 // Scoring Weights — must sum to exactly 1.0
 // =============================================================================
 const WEIGHTS = {
@@ -60,13 +148,13 @@ export function calculateMatchScore(
   // ── 3. Jaccard Skill Similarity (0→1, continuous) ───────────────────────
   const studentSkillSet = new Set(
     student.parsedSkills
-      .map((s) => s.toLowerCase().trim())
-      .filter((s) => s.length > 0),  // Remove empty strings post-trim
+      .map((s) => normalizeSkill(s))  // Normalize aliases before comparison
+      .filter((s) => s.length > 0),
   );
 
   const jobSkillSet = new Set(
     job.requiredSkills
-      .map((s) => s.toLowerCase().trim())
+      .map((s) => normalizeSkill(s))  // Normalize aliases before comparison
       .filter((s) => s.length > 0),
   );
 

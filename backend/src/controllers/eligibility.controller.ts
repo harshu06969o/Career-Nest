@@ -250,6 +250,20 @@ export const checkAndApply = async (req: Request, res: Response): Promise<void> 
       },
     });
 
+    // ── Step 6b: Invalidate the jobs:all cache ────────────────────────────────
+    // The Redis cache stores _count.applications at the time the cache was last
+    // built. Without this DEL, every admin/recruiter dashboard shows stale
+    // applicant counts (always 0) until the TTL naturally expires (1 hour).
+    // Fire-and-forget: cache invalidation failure must never break the apply flow.
+    void (async () => {
+      try {
+        await redisClient.del('jobs:all');
+        console.log('[Cache] DEL jobs:all — applicant count updated after new application');
+      } catch (cacheErr) {
+        console.error('[Cache] DEL jobs:all failed (non-fatal):', cacheErr);
+      }
+    })();
+
     // ── Step 7: Send confirmation email (fire-and-forget) ────────────────────
     // We intentionally DO NOT await this promise before sending the HTTP
     // response.  Email delivery is non-critical infrastructure; a slow or

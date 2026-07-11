@@ -39,20 +39,96 @@ interface MatchedJob {
   };
 }
 
+// =============================================================================
+// Frontend Skill Alias Map — mirrors backend matcher.service.ts
+// =============================================================================
+// When parsedSkills has "dsa" but JD requires "data structures and algorithms",
+// the display should show a green ✓. This map normalizes both sides before
+// comparison, exactly matching what the backend matcher does.
+// =============================================================================
+const FRONTEND_SKILL_ALIASES: Record<string, string> = {
+  'dsa':                              'data structures and algorithms',
+  'data structures':                  'data structures and algorithms',
+  'data structure':                   'data structures and algorithms',
+  'algorithms':                       'data structures and algorithms',
+  'ds & algorithms':                  'data structures and algorithms',
+  'oop':                              'object-oriented programming',
+  'oops':                             'object-oriented programming',
+  'object oriented programming':      'object-oriented programming',
+  'object-oriented':                  'object-oriented programming',
+  'os':                               'operating system',
+  'operating systems':                'operating system',
+  'dbms':                             'database management system',
+  'database management':              'database management system',
+  'cn':                               'computer networks',
+  'computer networking':              'computer networks',
+  'networking':                       'computer networks',
+  'ml':                               'machine learning',
+  'dl':                               'deep learning',
+  'ai':                               'artificial intelligence',
+  'nlp':                              'natural language processing',
+  'cv':                               'computer vision',
+  'computer-vision':                  'computer vision',
+  'cicd':                             'ci cd',
+  'ci/cd':                            'ci cd',
+  // REST API — most common mismatch
+  'restapi':                          'rest api',
+  'rest apis':                        'rest api',
+  'restful':                          'rest api',
+  'restful api':                      'rest api',
+  'restful apis':                     'rest api',
+  'rest':                             'rest api',
+  // Language shorthands
+  'js':                               'javascript',
+  'ts':                               'typescript',
+  // Framework/Library normalizations
+  'reactjs':                          'react',
+  'react.js':                         'react',
+  'vuejs':                            'vue.js',
+  'vue':                              'vue.js',
+  'angularjs':                        'angular',
+  'nodejs':                           'node.js',
+  'node js':                          'node.js',
+  'nextjs':                           'next.js',
+  'next js':                          'next.js',
+  'expressjs':                        'express',
+  'express.js':                       'express',
+  // Database normalizations
+  'postgres':                         'postgresql',
+  'mongo':                            'mongodb',
+  // Cloud/DevOps
+  'gcp':                              'google cloud platform',
+  'google cloud':                     'google cloud platform',
+  'k8s':                              'kubernetes',
+  'kube':                             'kubernetes',
+  // ML/Data Science
+  'sklearn':                          'scikit-learn',
+  'scikit learn':                     'scikit-learn',
+  'tf':                               'tensorflow',
+  'torch':                            'pytorch',
+};
+
+function normalizeSkillFrontend(s: string): string {
+  const lower = s.toLowerCase().trim();
+  return FRONTEND_SKILL_ALIASES[lower] ?? lower;
+}
+
 /**
  * Performs a zero-token local computation to determine the skill gap.
- * 
- * @param {string[]} required - Array of skills required by the job.
- * @param {string[]} studentSkills - Array of skills extracted from the student's resume.
- * @returns {{ matched: string[], missing: string[] }} The intersection and difference of the two sets.
+ * Both sides are alias-normalized (same as backend) so display pills
+ * are accurate: "dsa" in parsedSkills correctly matches "data structures and algorithms" in JD.
  */
 function analyzeSkillGap(required: string[], studentSkills: string[]) {
-  const studentSkillsLower = studentSkills.map(s => s.toLowerCase());
+  // Normalize ALL student skills through the alias map before building the lookup set
+
+  const studentNormalized = new Set(studentSkills.map(s => normalizeSkillFrontend(s)));
   const matched: string[] = [];
   const missing: string[] = [];
 
   required.forEach(skill => {
-    if (studentSkillsLower.includes(skill.toLowerCase())) {
+    // Normalize the JD skill too before checking membership
+    const normalizedJobSkill = normalizeSkillFrontend(skill);
+    if (studentNormalized.has(normalizedJobSkill)) {
       matched.push(skill);
     } else {
       missing.push(skill);
@@ -61,6 +137,51 @@ function analyzeSkillGap(required: string[], studentSkills: string[]) {
 
   return { matched, missing };
 }
+
+
+// =============================================================================
+// Skill Advice Map — Actionable, Recruiter-Quality Tips
+// =============================================================================
+// Each entry maps a canonical lowercase skill name to a one-line actionable tip.
+// Shown in the skill gap advice panel. Generic fallback used for unlisted skills.
+// =============================================================================
+const SKILL_ADVICE: Record<string, string> = {
+  'data structures and algorithms': 'Practice on LeetCode — start with NeetCode 150 roadmap (Arrays → Linked Lists → Trees). Target 2–3 problems/day.',
+  'react':          'Build a portfolio project: a todo-app → weather dashboard → e-commerce page. Official docs + Scrimba React course cover 90% of interviews.',
+  'node.js':        'Build a REST API with Express + MongoDB. Add authentication (JWT) to stand out in interviews.',
+  'rest api':       'Create a CRUD API with Node.js + Express. Document it with Postman/Swagger — this alone impresses most interviewers.',
+  'express':        'Build 2–3 REST APIs with Express. Middleware, routing, and error handling are the key interview topics.',
+  'python':         'Complete Python basics on freeCodeCamp, then build a web scraper or data analysis script with pandas to demonstrate applied skills.',
+  'machine learning': 'Start with Andrew Ng’s ML Specialization on Coursera. Build a classification or regression project using scikit-learn.',
+  'deep learning':  'Complete fast.ai’s Practical Deep Learning course. Build an image classifier using PyTorch or TensorFlow.',
+  'docker':         'Complete Docker’s official “Get Started” guide (2 hrs). Then containerize one of your existing projects — mention this in your resume.',
+  'kubernetes':     'After Docker, do the official Kubernetes Basics tutorial on kubernetes.io. Focus on Pods, Services, and Deployments.',
+  'ci cd':          'Set up a GitHub Actions pipeline for one of your projects: lint → test → build. This is a top hiring differentiator.',
+  'sql':            'Complete SQLZoo or Mode Analytics SQL Tutorial. Practice JOINs, GROUP BY, and window functions — all common in interviews.',
+  'postgresql':     'Install Postgres locally, design a schema for a real project, practice complex queries and indexing strategies.',
+  'mongodb':        'Build a CRUD app with Mongoose + Express. Understand schema design, indexing, and aggregation pipelines.',
+  'typescript':     'Convert one of your JavaScript projects to TypeScript. Focus on interfaces, generics, and strict mode.',
+  'javascript':     'Master async/await, closures, prototypes, and the event loop. These are the most tested JS concepts in interviews.',
+  'html':           'Build 2–3 responsive layouts from scratch. Focus on semantic HTML5 and accessibility (ARIA labels).',
+  'css':            'Learn Flexbox and CSS Grid (css-tricks.com guides). Rebuild a popular website layout as a practice exercise.',
+  'java':           'Practice OOP design patterns (Singleton, Factory, Observer) in Java. These appear in almost every Java interview.',
+  'spring':         'Build a Spring Boot REST API with JPA/Hibernate. Add Spring Security for authentication — shows production-readiness.',
+  'aws':            'Get the AWS Cloud Practitioner certification (free practice exams on ExamTopics). Set up an EC2 + S3 project.',
+  'google cloud platform': 'Complete the Google Cloud Skills Boost free labs. Build a basic Cloud Run deployment to demonstrate hands-on experience.',
+  'system design':  'Study Grokking the System Design Interview. Practice designing URL shortener, Twitter feed, and ride-sharing apps.',
+  'object-oriented programming': 'Study the SOLID principles and practice implementing design patterns in your primary language.',
+  'git':            'Practice branching strategies (GitFlow), pull requests, and conflict resolution. Contribute to an open-source project.',
+  'computer networks': 'Study OSI model, TCP/IP, HTTP/HTTPS, DNS, and sockets. Computer Networking by Kurose & Ross is the best reference.',
+  'operating system': 'Focus on process management, memory management, deadlocks, and threading. OSTEP (Three Easy Pieces) is free online.',
+  'database management system': 'Study normalization (1NF–3NF–BCNF), ACID properties, transactions, and indexing. These are core to every backend interview.',
+  'tensorflow':     'Complete TensorFlow’s official tutorials. Build a CNN for image classification to demonstrate practical ML skills.',
+  'pytorch':        'Complete fast.ai’s PyTorch course. Build a custom neural network from scratch to show deep understanding.',
+  'scikit-learn':   'Build end-to-end ML pipelines: data preprocessing → model training → evaluation → hyperparameter tuning.',
+  'next.js':        'Build a full-stack app using Next.js App Router with server components and API routes. Deploy on Vercel.',
+  'graphql':        'Add a GraphQL API to one of your projects using Apollo Server. Compare REST vs GraphQL in your project README.',
+  'redis':          'Implement caching and session management with Redis in a Node.js app. Rate limiting with Redis is a bonus.',
+};
+
 
 /**
  * Student Dashboard Component.
@@ -208,7 +329,9 @@ export default function StudentDashboard() {
             <p className="text-slate-500 mt-1 text-sm">
               Welcome back,{' '}
               <span className="text-slate-700 font-semibold">
-                {profile?.firstName ?? user?.email ?? 'Student'}
+                {(profile?.firstName?.trim())
+                  ? `${profile.firstName}${profile.lastName?.trim() ? ' ' + profile.lastName : ''}`.trim()
+                  : 'Student'}
               </span>
             </p>
           </div>
@@ -493,26 +616,88 @@ export default function StudentDashboard() {
                         ))}
                       </div>
 
-                      {/* Dynamic Advice Snippet */}
-                      {missing.length > 0 && (
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-2.5">
-                          <Info size={15} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-indigo-800 leading-relaxed">
-                            <strong>Tip:</strong> You are missing{' '}
-                            <span className="font-bold text-indigo-700">{missing[0]}</span>. Consider adding a
-                            project using this skill before applying to {companyName}.
-                          </p>
-                        </div>
-                      )}
-                      {missing.length === 0 && matched.length > 0 && (
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 flex items-start gap-2.5">
+                      {/* Smart Resume Improvement Advice */}
+                      {missing.length === 0 && matched.length > 0 ? (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
                           <CheckCircle size={15} className="text-emerald-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-emerald-800 leading-relaxed">
-                            <strong>Perfect Match!</strong> Your resume covers all required skills. You have a
-                            high chance of standing out to {companyName}.
-                          </p>
+                          <div>
+                            <p className="text-sm font-bold text-emerald-800">Perfect Match! 🎉</p>
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              Your resume covers all {matched.length} required skill{matched.length !== 1 ? 's' : ''}.
+                              You have a strong chance of standing out to {companyName}.
+                            </p>
+                          </div>
                         </div>
-                      )}
+                      ) : missing.length > 0 ? (
+                        <div className={cn(
+                          'rounded-xl p-4 space-y-3 border',
+                          missing.length <= 2
+                            ? 'bg-amber-50 border-amber-100'
+                            : missing.length <= 5
+                            ? 'bg-orange-50 border-orange-100'
+                            : 'bg-red-50 border-red-100',
+                        )}>
+                          {/* Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Info size={14} className={cn(
+                                'flex-shrink-0',
+                                missing.length <= 2 ? 'text-amber-600' : missing.length <= 5 ? 'text-orange-600' : 'text-red-500',
+                              )} />
+                              <p className={cn(
+                                'text-xs font-bold uppercase tracking-wide',
+                                missing.length <= 2 ? 'text-amber-800' : missing.length <= 5 ? 'text-orange-800' : 'text-red-800',
+                              )}>
+                                {missing.length <= 2 ? 'Almost There — ' : missing.length <= 5 ? 'Skill Gap — ' : 'Significant Gap — '}
+                                {matched.length}/{matched.length + missing.length} skills matched
+                              </p>
+                            </div>
+                            <span className={cn(
+                              'text-[10px] font-bold px-2 py-0.5 rounded-full border',
+                              missing.length <= 2
+                                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                : missing.length <= 5
+                                ? 'bg-orange-100 text-orange-700 border-orange-200'
+                                : 'bg-red-100 text-red-700 border-red-200',
+                            )}>
+                              {missing.length} missing
+                            </span>
+                          </div>
+
+                          {/* Per-skill actionable advice (top 3) */}
+                          <div className="space-y-2">
+                            {missing.slice(0, 3).map((skill) => {
+                              const advice = SKILL_ADVICE[skill.toLowerCase()] ??
+                                `Build a hands-on project demonstrating ${skill}. Document it on GitHub with a clear README.`;
+                              return (
+                                <div
+                                  key={skill}
+                                  className="flex items-start gap-2.5 bg-white/70 rounded-lg p-2.5 border border-white/80 shadow-sm"
+                                >
+                                  <span className={cn(
+                                    'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
+                                    missing.length <= 2 ? 'bg-amber-400' : missing.length <= 5 ? 'bg-orange-400' : 'bg-red-400',
+                                  )} />
+                                  <div className="min-w-0">
+                                    <span className="text-xs font-bold text-slate-800 capitalize">{skill}</span>
+                                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{advice}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Overflow indicator */}
+                          {missing.length > 3 && (
+                            <p className={cn(
+                              'text-xs font-medium pl-4',
+                              missing.length <= 5 ? 'text-orange-700' : 'text-red-700',
+                            )}>
+                              + {missing.length - 3} more skill{missing.length - 3 > 1 ? 's' : ''} to work on — focus on the above first.
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
 
                     </div>
                   </div>
