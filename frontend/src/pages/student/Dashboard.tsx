@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
-import { useAuthStore } from '../../store/authStore';
 import CircularProgress from '../../components/CircularProgress';
 import { cn } from '../../lib/cn';
 
@@ -192,8 +191,6 @@ const SKILL_ADVICE: Record<string, string> = {
  * All API calls, state hooks, and event handlers are UNCHANGED.
  */
 export default function StudentDashboard() {
-  const { user } = useAuthStore();
-
   const [profile,   setProfile]   = useState<StudentProfile | null>(null);
   const [matches,   setMatches]   = useState<MatchedJob[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
