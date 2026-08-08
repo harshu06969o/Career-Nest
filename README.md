@@ -1,175 +1,338 @@
-<div align="center">
-  
+﻿<div align="center">
 
-# 🚀 CareerNest
+<img src="screenshots/careernest-banner.png" alt="CareerNest Banner" width="100%" />
 
-**Next-Generation AI-Powered Placement & Recruitment Portal**
+# CareerNest
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#)
-[![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg)](#)
-[![React](https://img.shields.io/badge/React-19-blue.svg)](#)
+**Next-Generation AI-Powered Campus Placement & Recruitment Platform**
 
-*CareerNest revolutionizes the university placement process through intelligent automation. It leverages the Google Gemini AI and a proprietary Hybrid Matching Engine to parse resumes, rank candidates in real-time with O(1) efficiency, and provide actionable skill-gap insights to students without incurring massive API costs.*
+[![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square&logo=github-actions)](https://github.com)
+[![Node.js](https://img.shields.io/badge/Node.js-v20+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
+[![Redis](https://img.shields.io/badge/Redis-Upstash-DC382D?style=flat-square&logo=redis&logoColor=white)](https://upstash.com)
+[![Gemini AI](https://img.shields.io/badge/Gemini-AI-4285F4?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+
+*CareerNest eliminates the inefficiency of manual campus placements. It leverages Google Gemini AI for zero-manual-entry resume parsing and a proprietary O(1) Hybrid Matching Engine (Jaccard similarity + hard filters) to rank candidates against job postings in real time — with zero LLM cost on every page load.*
+
+[Live Demo](#) · [Report a Bug](https://github.com) · [Request Feature](https://github.com)
 
 </div>
 
 ---
 
-## 🚀 Core Features & Product Capabilities
+## 📸 Visual Tour
 
-### 👥 Multi-Persona Ecosystem
-1. **Student:** Upload resumes, get instant AI-parsed profiles, view ranked job matches, and receive dynamic skill-gap advice.
-2. **Recruiter:** Post job requirements (AI auto-extracts criteria), track active listings, and instantly view a ranked list of top-matched applicants.
-3. **Admin / Placement Cell:** Oversee the entire ecosystem, manage users, and delete any inappropriate listings or profiles.
-
-### 🧠 AI-Powered Resume Parsing
-- **Pipeline:** PDF upload → Cloudinary CDN → Stream processing via `pdf-parse` → **Google Gemini API** (using Controlled Generation JSON schemas).
-- Extracts structured metrics (Skills array, CGPA, Years of Experience) directly from unstructured PDF text, completely eliminating manual data entry.
-
-### ⚡ Hybrid Matching Engine
-- **O(1) Efficiency:** Calculates candidate-job compatibility entirely in-process using pre-parsed database payloads, achieving zero latency and zero LLM API cost on every page load.
-- **Algorithm:** 70% Jaccard Skill Similarity (Set theory intersection over union) + 30% Hard Filters (Proportional scaling for CGPA and Experience).
-
-### 💡 Zero-Token Skill Gap Advice
-- Performs a local intersection computation to identify exactly which required skills a student is missing.
-- Dynamically generates actionable "Tip" alerts on the student dashboard encouraging targeted project building, completely free of generative AI token costs.
+| | |
+|:---:|:---:|
+| ![Landing Page](screenshots/landing.png) <br /> **Landing Page** — Clean hero with feature trust strip | ![Auth Page](screenshots/auth-login.png) <br /> **Authentication** — Role-aware login & registration |
+| ![Student Dashboard](screenshots/student-dashboard.png) <br /> **Student Dashboard** — AI job matches & skill gap | ![Recruiter Dashboard](screenshots/recruiter-dashboard.png) <br /> **Recruiter Dashboard** — Post jobs & track applicants |
+| ![Skill Gap](screenshots/student-dashboard-bottom.png) <br /> **Skill Gap Analysis** — Zero-token actionable advice | ![Admin Panel](screenshots/admin-dashboard.png) <br /> **Admin Panel** — Platform governance & stats |
 
 ---
 
-## 📸 Application Screenshots (Visual Tour)
+## 🚀 Core Features
 
-| Student Dashboard | Recruiter Job Posting |
-| :---: | :---: |
-| ![Student Dashboard - Job Matches & Skill Gap](screenshots/student-dashboard.png) <br> *AI Job Matches & Skill Gap Analysis* | ![Recruiter Job Posting](screenshots/recruiter-posting.png) <br> *AI-Assisted Job Requirements Extraction* |
+### 👥 Multi-Role Ecosystem
 
-| Applicant Tracking | Admin Stats Panel |
-| :---: | :---: |
-| ![Applicant Tracking View](screenshots/applicant-tracking.png) <br> *Ranked Candidate List by Match Score* | ![Admin Stats Panel](screenshots/admin-panel.png) <br> *Global Placement Statistics & Governance* |
+| Role | Capabilities |
+|:---|:---|
+| **Student** | Upload resume → AI parses skills/CGPA/experience → View ranked job matches → Receive zero-cost skill-gap advice |
+| **Recruiter** | Post jobs in natural language → AI extracts structured criteria → View ranked applicant list with match scores → Update application status |
+| **Admin / Placement Cell** | Platform-wide statistics dashboard → User management → Delete inappropriate postings or profiles |
 
----
+### 🧠 AI-Powered Resume Parsing Pipeline
 
-## 🏗️ Tech Stack & System Architecture
-
-### 🛠️ Technologies
-| Layer | Technology |
-| --- | --- |
-| **Frontend** | React 19, Vite, Tailwind CSS, Zustand, React Router, Axios, Lucide React |
-| **Backend** | Node.js, Express.js, Prisma ORM, bcryptjs, JWT |
-| **Database & Cache** | MongoDB (Atlas), Redis (Upstash) |
-| **Cloud & AI Services** | Google Gemini (Gen AI), Cloudinary (CDN), Nodemailer (SMTP) |
-
-### 🔄 Data Flow Architecture
-1. **Client Request:** Frontend issues JWT-protected requests via Axios.
-2. **Controller Logic:** Express controllers handle validation and authorize roles.
-3. **Cache Layer:** Redis sits in front of read-heavy routes (like `getAllJobs`), serving responses in microseconds. Cache invalidation happens atomically on writes.
-4. **AI & Database:** Uploads are streamed to Cloudinary, parsed via Gemini, and structured payloads are written to MongoDB utilizing Prisma ORM.
-
----
-
-## 🔐 Environment Variables
-
-Create a `.env` file in the `backend/` directory and configure the following variables. *Never commit your actual secrets.*
-
-| Variable Name | Description | Required? |
-| :--- | :--- | :---: |
-| `PORT` | The port the backend server runs on (e.g., `5000`) | Yes |
-| `DATABASE_URL` | MongoDB connection string (Local or Atlas) | Yes |
-| `REDIS_URL` | Redis instance connection string (e.g., Upstash) | Yes |
-| `JWT_SECRET` | Secret key for signing JSON Web Tokens | Yes |
-| `JWT_EXPIRES_IN` | Token validity duration (e.g., `7d`) | Yes |
-| `GEMINI_API_KEY` | API Key for Google Gemini LLM access | Yes |
-| `ADMIN_SECRET` | Passphrase required to register an Admin account | Yes |
-| `USE_MOCK_LLM` | Set to `true` to bypass real AI calls during local dev | No |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary account Cloud Name | Yes |
-| `CLOUDINARY_API_KEY` | Cloudinary account API Key | Yes |
-| `CLOUDINARY_API_SECRET` | Cloudinary account API Secret | Yes |
-| `SMTP_HOST` / `SMTP_PORT` | SMTP Server configuration for emails | No |
-| `SMTP_USER` / `SMTP_PASS` | SMTP Authentication credentials | No |
-
-
----
-
-## 🛠️ Local Development Setup
-
-Follow these steps to run the project locally.
-
-**1. Clone the repository**
-```bash
-git clone https://github.com/yourusername/career-nest.git
-cd career-nest
+```
+PDF Upload → Cloudinary CDN → pdf-parse (text extraction) → Google Gemini API
+         (Controlled Generation with JSON Schema)
+         → Structured { skills[], cgpa, experienceYears } → MongoDB
 ```
 
-**2. Setup the Backend**
-```bash
-cd backend
-npm install
-# Create and configure your .env file here
-npx prisma generate
-npm run dev
+- Uses Gemini **Controlled Generation** (JSON schema enforcement) to extract perfectly structured data from unstructured PDF text
+- **Zero manual entry** — students upload once, the system profiles them automatically
+- `USE_MOCK_LLM=true` flag for local dev that bypasses real API calls
+
+### ⚡ Hybrid O(1) Matching Engine
+
+The core scoring algorithm runs **entirely in-process** — zero external API calls:
+
+```
+Final Score = (0.7 × Jaccard Skill Similarity) + (0.3 × Proportional Hard Filters)
+
+Jaccard(A, B) = |A ∩ B| / |A ∪ B|   where A = student skills, B = job required skills
+Hard Filters  = normalized(CGPA score) + normalized(Experience score)
 ```
 
-**3. Setup the Frontend**
-```bash
-# In a new terminal tab
-cd frontend
-npm install
-npm run dev
-```
+- Hard filters (CGPA, experience) eliminate ineligible students *before* any scoring
+- Results cached in **Redis** (Upstash) for sub-millisecond subsequent reads
 
-The application will now be running. The frontend typically starts at `http://localhost:5173` and the backend at `http://localhost:5000`.
+### 💡 Zero-Token Skill Gap Advisor
+
+- Local set-difference: `missingSkills = jobRequiredSkills - studentParsedSkills`
+- Generates dynamic, actionable "build a project in X" tips — **completely free**, no generative AI cost
+- Updates automatically as students upload new resumes
+
+### 🔒 Security & Reliability
+
+- **JWT-based stateless auth** with strict role isolation (`STUDENT` | `RECRUITER` | `ADMIN`)
+- **bcrypt** (12 rounds) with constant-time dummy-hash comparison to prevent timing attacks
+- **Helmet.js** for HTTP security headers; **express-rate-limit** on all routes
+- **Admin Secret** passphrase required for admin account registration
 
 ---
 
-## 📂 Project Folder Structure
+## 🏗️ Tech Stack
 
-```ascii
+| Layer | Technology | Purpose |
+|:---|:---|:---|
+| **Frontend** | React 19, Vite, TypeScript | UI framework & build tooling |
+| **Styling** | Tailwind CSS v3, Lucide React | Utility-first design system |
+| **State** | Zustand | Lightweight client state management |
+| **HTTP** | Axios, React Router v6 | API client & client-side routing |
+| **Backend** | Node.js v20, Express.js, TypeScript | REST API server |
+| **ORM** | Prisma v6 (MongoDB driver) | Type-safe database access |
+| **Database** | MongoDB Atlas (Free M0) | Primary document store |
+| **Cache** | Redis via Upstash (TLS) | Route-level caching & invalidation |
+| **AI / LLM** | Google Gemini 2.0 Flash | Resume parsing & skill extraction |
+| **Storage** | Cloudinary | PDF resume CDN & streaming |
+| **Email** | Nodemailer (SMTP / Gmail) | Application status notifications |
+| **Auth** | JWT + bcryptjs | Stateless authentication |
+| **Security** | Helmet, express-rate-limit | HTTP hardening & DDoS mitigation |
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLIENT (React 19)                    │
+│  Zustand Store ──► Axios (JWT headers) ──► Vite Dev Server  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ HTTP/REST
+┌───────────────────────────▼─────────────────────────────────┐
+│                   EXPRESS.JS API (Port 5000)                 │
+│                                                             │
+│  Helmet ──► Rate Limiter ──► JWT Middleware ──► Role Guard  │
+│                                    │                        │
+│          ┌─────────────────────────▼──────────────┐         │
+│          │  auth | student | job | eligibility     │         │
+│          └──────────────┬──────────────────────────┘         │
+│                         │                                   │
+│        ┌────────────────▼────────────────────┐              │
+│        │  llm.service  │  matcher.service    │              │
+│        └────┬──────────────────────┬─────────┘              │
+│             │                      │                        │
+│    ┌────────▼──────┐    ┌──────────▼───────┐                │
+│    │  Gemini API   │    │  Jaccard Engine  │                │
+│    │  Cloudinary   │    │  (in-process)    │                │
+│    └───────────────┘    └──────────────────┘                │
+│  ┌───────────────────────┐   ┌────────────────────────┐     │
+│  │   Prisma ORM          │   │   Redis (Upstash)      │     │
+│  │   MongoDB Atlas       │   │   Cache + Invalidation │     │
+│  └───────────────────────┘   └────────────────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🗂️ Project Structure
+
+```
 career-nest/
 ├── backend/
-│   ├── prisma/                  # Database schema models
+│   ├── prisma/
+│   │   └── schema.prisma          # User, StudentProfile, RecruiterProfile, Job, Application
 │   ├── src/
-│   │   ├── config/              # Prisma, Redis, Cloudinary initialization
-│   │   ├── controllers/         # Core business logic (auth, jobs, students)
-│   │   ├── middlewares/         # JWT verification, Role checks, Multer
-│   │   ├── routes/              # Express API route definitions
+│   │   ├── config/
+│   │   │   ├── prismaClient.ts    # Singleton (prevents hot-reload connection leaks)
+│   │   │   └── redisClient.ts     # Upstash TLS Redis client
+│   │   ├── controllers/
+│   │   │   ├── auth.controller.ts        # Register + Login (bcrypt & JWT)
+│   │   │   ├── student.controller.ts     # Resume upload → Cloudinary → Gemini parse
+│   │   │   ├── job.controller.ts         # Job CRUD + AI criteria extraction
+│   │   │   └── eligibility.controller.ts # Jaccard scoring + skill gap
+│   │   ├── middlewares/
+│   │   │   ├── auth.middleware.ts    # JWT verification
+│   │   │   ├── role.middleware.ts    # Role-based access control
+│   │   │   ├── multer.middleware.ts  # PDF file upload handling
+│   │   │   └── rateLimiter.ts       # Global rate limiting
+│   │   ├── routes/                  # auth | student | job | eligibility
 │   │   ├── services/
-│   │   │   ├── llm.service.ts     # 🧠 Gemini parsing & PDF extraction
-│   │   │   └── matcher.service.ts # ⚡ Hybrid Jaccard scoring engine
-│   │   └── server.ts            # Entry point
-│   ├── .env                     # Environment variables
+│   │   │   ├── llm.service.ts       # 🧠 Gemini PDF parsing pipeline
+│   │   │   └── matcher.service.ts   # ⚡ Hybrid Jaccard scoring engine
+│   │   ├── utils/ & types/
+│   │   ├── app.ts                   # Express setup, middleware, route mounting
+│   │   └── server.ts                # HTTP server entry point
+│   ├── .env                         # Secrets (never commit)
 │   └── package.json
+│
 └── frontend/
     ├── src/
-    │   ├── components/          # Reusable UI (Layout, Spinners)
-    │   ├── lib/                 # Axios instance, Tailwind merge utilities
-    │   ├── pages/               # Role-based views
-    │   │   ├── student/
-    │   │   │   └── Dashboard.tsx  # 🎯 Skill Gap & Job Match UI
-    │   │   ├── recruiter/
-    │   │   │   └── Dashboard.tsx  # 📊 Applicant Tracking UI
-    │   │   └── auth/
-    │   ├── store/
-    │   │   └── authStore.ts       # Zustand state management
-    │   └── App.tsx              # Router & Guard configuration
+    │   ├── components/
+    │   │   ├── Layout.tsx           # Global navbar + outlet wrapper
+    │   │   └── ProtectedRoute.tsx   # Role-guard HOC
+    │   ├── pages/
+    │   │   ├── Landing.tsx          # Public hero page
+    │   │   ├── Auth.tsx             # Login + Register (role-aware form)
+    │   │   ├── student/Dashboard.tsx    # 🎯 AI matches + skill gap analysis
+    │   │   ├── recruiter/Dashboard.tsx  # 📊 Job posting + applicant tracking
+    │   │   └── admin/Dashboard.tsx      # 🛡️ Platform stats + governance
+    │   ├── store/authStore.ts       # Zustand auth state + persistence
+    │   └── App.tsx                  # BrowserRouter + role-based routing
+    ├── tailwind.config.js
     ├── vite.config.ts
     └── package.json
 ```
 
 ---
 
-## 🛣️ Core API Reference
+## 🔐 Environment Variables
 
-| Method | Endpoint | Description | Protected Status |
-| :---: | :--- | :--- | :--- |
-| **POST** | `/api/auth/register` | Create a User and provision specific Profile | Public |
-| **POST** | `/api/student/resume` | Extract PDF text, parse via LLM, update profile | 🔒 `STUDENT` |
-| **POST** | `/api/jobs` | Parse requirements via LLM, save to DB, prime cache | 🔒 `RECRUITER` |
-| **GET** | `/api/jobs/my-postings` | Fetch active listings for the logged-in recruiter | 🔒 `RECRUITER` |
-| **GET** | `/api/jobs/:jobId/applicants`| View joined student data ranked by match score | 🔒 `RECRUITER / ADMIN` |
-| **GET** | `/api/eligibility/matches`| Calculate Jaccard similarity and return job feed | 🔒 `STUDENT` |
+Create `backend/.env` with the following. **Never commit real secrets to Git.**
+
+| Variable | Description | Required |
+|:---|:---|:---:|
+| `PORT` | Backend port (default: `5000`) | ✅ |
+| `DATABASE_URL` | MongoDB Atlas URI — **must include database name** (`.../careernest?...`) | ✅ |
+| `REDIS_URL` | Upstash Redis TLS URL (`rediss://...`) | ✅ |
+| `JWT_SECRET` | Secret for signing JWTs | ✅ |
+| `JWT_EXPIRES_IN` | Token expiry e.g. `7d` | ✅ |
+| `GEMINI_API_KEY` | Google AI Studio key | ✅ |
+| `ADMIN_SECRET` | Passphrase for Admin registration | ✅ |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | ✅ |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | ✅ |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | ✅ |
+| `SMTP_HOST` / `SMTP_PORT` | SMTP server e.g. `smtp.gmail.com` / `587` | Optional |
+| `SMTP_USER` / `SMTP_PASS` | SMTP credentials (Gmail App Password recommended) | Optional |
+| `USE_MOCK_LLM` | `true` to skip Gemini calls in local dev | Optional |
+
+> **Important:** Your `DATABASE_URL` must include the database name in the URI path:
+> `mongodb://user:pass@host1,host2,host3/`**`careernest`**`?replicaSet=...`
+> Omitting the database name causes an Atlas `Error 8000: empty database name not allowed`.
 
 ---
+
+## 🛠️ Local Development Setup
+
+### Prerequisites
+
+- **Node.js** v20+  &  **npm** v9+
+- [MongoDB Atlas](https://www.mongodb.com/atlas) — Free M0 cluster
+- [Upstash Redis](https://upstash.com) — Free tier
+- [Google AI Studio](https://aistudio.google.com/app/apikey) — Free API key (1,500 req/day)
+- [Cloudinary](https://cloudinary.com) — Free account
+
+### 1. Clone
+
+```bash
+git clone https://github.com/yourusername/career-nest.git
+cd career-nest
+```
+
+### 2. Backend Setup
+
+```bash
+cd backend
+npm install
+# Create .env and fill in all required variables (see table above)
+npx prisma generate
+npm run dev
+# → Server: http://localhost:5000
+```
+
+### 3. Frontend Setup
+
+```bash
+# Open a new terminal
+cd frontend
+npm install
+npm run dev
+# → App: http://localhost:5173
+```
+
+### 4. Health Check
+
+```bash
+curl http://localhost:5000/api/health
+# {"status":"ok","message":"API is healthy"}
+```
+
+### Demo Accounts
+
+Register via `http://localhost:5173/auth`:
+
+| Role | Registration Notes |
+|:---|:---|
+| **Student** | Select "Student" role → fill First/Last name, College, CGPA |
+| **Recruiter** | Select "Recruiter" role → fill Company name, Designation |
+| **Admin** | Select "Admin" role → enter the `ADMIN_SECRET` value from your `.env` |
+
+---
+
+## 📡 API Reference
+
+All protected routes require `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Description | Auth |
+|:---:|:---|:---|:---|
+| `GET` | `/api/health` | Server health check | Public |
+| `POST` | `/api/auth/register` | Create user + provision role profile | Public |
+| `POST` | `/api/auth/login` | Authenticate, receive JWT | Public |
+| `POST` | `/api/student/resume` | Upload PDF → Cloudinary → Gemini → DB | `STUDENT` |
+| `GET` | `/api/student/profile` | Fetch own parsed profile | `STUDENT` |
+| `POST` | `/api/jobs` | Create job posting (AI extracts criteria) | `RECRUITER` |
+| `GET` | `/api/jobs` | List active jobs (Redis cached) | `STUDENT` |
+| `GET` | `/api/jobs/my-postings` | Recruiter's own listings | `RECRUITER` |
+| `GET` | `/api/jobs/:jobId/applicants` | Applicants ranked by match score | `RECRUITER` / `ADMIN` |
+| `PATCH` | `/api/jobs/:jobId/status` | Toggle job active/inactive | `RECRUITER` |
+| `GET` | `/api/eligibility/matches` | Jaccard-scored job feed | `STUDENT` |
+| `POST` | `/api/eligibility/apply/:jobId` | Apply to job (persists matchScore) | `STUDENT` |
+
+---
+
+## 🔭 Roadmap & Upcoming Improvements
+
+### Infrastructure & Scalability
+- **RabbitMQ / BullMQ Message Queue** — Offload resume parsing, email delivery, and match recomputation to background workers, fully decoupling them from synchronous HTTP requests for production-grade reliability
+- **AWS S3 Bucket Storage** — Replace Cloudinary with S3 for enterprise-grade durability, lifecycle policies, and lower egress costs at scale
+- **Docker + Docker Compose** — One-command local setup and environment parity across dev and production
+
+### Authentication & User Experience
+- **OAuth 2.0 / Google Sign-In** — One-click social login for students and recruiters via Google, eliminating password friction at registration
+- **Recruiter-Built Application Forms** — Recruiters can design and publish custom forms (role-specific questions, assessments) that students fill out within the platform, replacing fragmented external tools like Google Forms
+- **Real-time WebSocket Notifications** — Instant alerts on application status changes (Shortlisted / Rejected) without polling
+
+### AI & Matching Intelligence
+- **MongoDB Atlas Vector Search** — Replace string-array Jaccard with semantic vector embeddings for fuzzy skill matching ("ReactJS" ↔ "React.js" ↔ "React")
+- **LLM Interview Prep** — AI-generated role-specific interview questions and feedback based on each student's skill gap
+- **Batch Resume Processing** — Admin-triggered bulk parsing via a queue-backed worker pipeline
+
+### Platform & Analytics
+- **Placement Analytics Dashboard** — Charts for placement rates, in-demand skills, recruiter activity, and time-to-hire
+- **Multi-Campus Support** — Tenant-aware architecture for multiple universities on one deployment
+- **In-Platform Resume Builder** — AI-assisted resume creator auto-populated from the student's parsed profile
+
+---
+
+## 🤝 Contributing
+
+1. **Fork** the repository
+2. **Branch**: `git checkout -b feature/your-feature`
+3. **Commit**: `git commit -m 'feat: your change'`
+4. **Push**: `git push origin feature/your-feature`
+5. **Open a Pull Request** against `main`
+
+Follow TypeScript strict mode and ESLint rules. Tests for new features are appreciated.
+
+---
+
+## 📄 License
+
+MIT License — see [`LICENSE`](LICENSE) for details.
+
+---
+
 <div align="center">
-  <i>Built with ❤️ for modern software engineering placements.</i>
+  <p>Built with ❤️ for modern software engineering placements.</p>
 </div>
