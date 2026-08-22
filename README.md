@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-<img src="screenshots/careernest-banner.png" alt="CareerNest Banner" width="100%" />
+
 
 # CareerNest
 
