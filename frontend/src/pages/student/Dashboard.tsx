@@ -262,8 +262,11 @@ export default function StudentDashboard() {
       toast.success('Resume uploaded & parsed! ✨');
       await fetchProfile();
       await fetchMatches();
-    } catch {
-      toast.error('Upload failed. Please try again.');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Upload failed. Please try again.';
+      toast.error(msg);
     } finally {
       setUploading(false);
     }

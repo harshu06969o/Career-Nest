@@ -84,21 +84,25 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
   const expFloat = experienceYears !== undefined ? parseFloat(String(experienceYears)) : undefined;
 
   try {
-    const result = await prisma.studentProfile.updateMany({
+    await prisma.studentProfile.upsert({
       where: { userId },
-      data: {
+      update: {
         ...(firstName !== undefined && { firstName: firstName.trim() }),
         ...(lastName  !== undefined && { lastName:  lastName.trim()  }),
         ...(college   !== undefined && { college:   college.trim()   }),
         ...(cgpaFloat !== undefined && { cgpa:      cgpaFloat        }),
         ...(expFloat  !== undefined && { experienceYears: expFloat   }),
       },
+      create: {
+        userId,
+        firstName: firstName !== undefined ? firstName.trim() : '',
+        lastName:  lastName !== undefined ? lastName.trim() : '',
+        college:   college !== undefined ? college.trim() : 'Unknown College',
+        cgpa:      cgpaFloat !== undefined ? cgpaFloat : 0,
+        experienceYears: expFloat !== undefined ? expFloat : 0,
+        parsedSkills: [],
+      }
     });
-
-    if (result.count === 0) {
-      res.status(404).json({ success: false, message: 'Student profile not found.' });
-      return;
-    }
 
     // Return updated profile
     const updated = await prisma.studentProfile.findUnique({
@@ -183,24 +187,26 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
 
   // Execute a single atomic database write
   try {
-    const result = await prisma.studentProfile.updateMany({
+    await prisma.studentProfile.upsert({
       where: { userId },
-      data: {
+      update: {
         resumeUrl,
         parsedSkills: parsedData.skills,
         experienceYears: parsedData.experienceYears,
         cgpa: parsedData.cgpa,
         ...(parsedData.college !== "" && { college: parsedData.college }),
       },
+      create: {
+        userId,
+        firstName: '',
+        lastName: '',
+        college: parsedData.college !== "" ? parsedData.college : 'Unknown College',
+        resumeUrl,
+        parsedSkills: parsedData.skills,
+        experienceYears: parsedData.experienceYears,
+        cgpa: parsedData.cgpa,
+      },
     });
-
-    if (result.count === 0) {
-      res.status(404).json({
-        success: false,
-        message: 'Student profile not found. Please complete your profile setup first.',
-      });
-      return;
-    }
   } catch (dbError) {
     console.error('[DB Write] Student profile update failed:', dbError);
     res.status(500).json({

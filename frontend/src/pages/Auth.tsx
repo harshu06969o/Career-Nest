@@ -34,9 +34,14 @@ export default function Auth() {
   const [companyName,   setCompanyName]   = useState('');
   const [designation,   setDesignation]   = useState('');
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+
+    // Read directly from DOM to bypass React state bugs with browser autofill
+    const formData = new FormData(e.currentTarget);
+    const currentEmail = (formData.get('email') as string) || email;
+    const currentPassword = (formData.get('password') as string) || password;
 
     try {
       if (tab === 'login') {
@@ -44,7 +49,7 @@ export default function Auth() {
           success: boolean;
           message: string;
           data: { token: string; user: { userId: string; role: Role; email: string } };
-        }>('/auth/login', { email, password });
+        }>('/auth/login', { email: currentEmail, password: currentPassword });
 
         // Backend envelope: { success, message, data: { token, user } }
         setAuth(res.data.token, res.data.user);
@@ -54,8 +59,8 @@ export default function Auth() {
         // Build payload based on role
         const payload =
           role === 'STUDENT'
-            ? { email, password, role, firstName, lastName, college, cgpa: Number(cgpa) }
-            : { email, password, role, companyName, designation };
+            ? { email: currentEmail, password: currentPassword, role, firstName, lastName, college, cgpa: Number(cgpa) }
+            : { email: currentEmail, password: currentPassword, role, companyName, designation };
 
         // Register — backend does NOT return a token, only userId+email+role.
         // So we register then immediately log in to get a token.
@@ -65,7 +70,7 @@ export default function Auth() {
           success: boolean;
           message: string;
           data: { token: string; user: { userId: string; role: Role; email: string } };
-        }>('/auth/login', { email, password });
+        }>('/auth/login', { email: currentEmail, password: currentPassword });
 
         setAuth(loginRes.data.token, loginRes.data.user);
         toast.success('Account created successfully! 🚀');
@@ -178,7 +183,7 @@ export default function Auth() {
             )}
 
             {/* Email */}
-            <InputField label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
+            <InputField label="Email" name="email" value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
 
             {/* Password */}
             <div>
@@ -187,6 +192,7 @@ export default function Auth() {
               </label>
               <div className="relative">
                 <input
+                  name="password"
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -246,13 +252,14 @@ export default function Auth() {
 
 // ── Reusable input sub-component ──────────────────────────────────────────────
 function InputField({
-  label, value, onChange, placeholder, type = 'text',
+  label, value, onChange, placeholder, type = 'text', name
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  name?: string;
 }) {
   return (
     <div>
@@ -261,6 +268,7 @@ function InputField({
       </label>
       <input
         type={type}
+        name={name}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

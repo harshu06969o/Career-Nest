@@ -11,7 +11,7 @@ import { useAuthStore } from '../store/authStore';
 const api = axios.create({
   baseURL: (import.meta.env['VITE_API_URL'] as string | undefined) || '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15_000,
+  timeout: 60_000,
 });
 
 // =============================================================================
