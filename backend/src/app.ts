@@ -19,6 +19,11 @@ const __dirname  = dirname(__filename);
 
 const app: Application = express();
 
+// Trust the first proxy hop (Render's load balancer).
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// because it sees the X-Forwarded-For header but the proxy isn't trusted.
+app.set('trust proxy', 1);
+
 // =============================================================================
 // Security Middlewares
 // =============================================================================
