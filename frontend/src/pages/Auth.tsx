@@ -255,7 +255,7 @@ export default function Auth() {
           {/* Continue with Google — MUST be a real <a> tag, not Axios.
               OAuth requires a full browser navigation to the backend. */}
           <a
-            href="/api/auth/google"
+            href={`${(import.meta.env['VITE_API_URL'] as string | undefined) || '/api'}/auth/google`}
             className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg
                        border border-slate-300 bg-white hover:bg-slate-50 active:scale-[0.99]
                        text-sm font-semibold text-slate-700 transition-all duration-150 shadow-sm"
