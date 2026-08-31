@@ -52,7 +52,8 @@ enum ApplicationStatus {
 model User {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   email        String    @unique
-  passwordHash String
+  passwordHash String?
+  googleId     String?
   role         Role      @default(STUDENT)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -63,6 +64,10 @@ model User {
 
   // A recruiter user can post many jobs
   postedJobs Job[]
+
+  // Sparse unique index: allows multiple null values (OAuth users who haven't linked yet)
+  // but prevents two users from sharing the same googleId
+  @@index([googleId])
 
   @@map("users")
 }

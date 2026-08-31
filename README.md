@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 
 
@@ -77,6 +77,7 @@ Hard Filters  = normalized(CGPA score) + normalized(Experience score)
 
 ### 🔒 Security & Reliability
 
+- **OAuth 2.0 via Google** — One-click social login with seamless find-or-create account linking for Students and Recruiters
 - **JWT-based stateless auth** with strict role isolation (`STUDENT` | `RECRUITER` | `ADMIN`)
 - **bcrypt** (12 rounds) with constant-time dummy-hash comparison to prevent timing attacks
 - **Helmet.js** for HTTP security headers; **express-rate-limit** on all routes
@@ -99,7 +100,7 @@ Hard Filters  = normalized(CGPA score) + normalized(Experience score)
 | **AI / LLM** | Google Gemini 2.0 Flash | Resume parsing & skill extraction |
 | **Storage** | Cloudinary | PDF resume CDN & streaming |
 | **Email** | Nodemailer (SMTP / Gmail) | Application status notifications |
-| **Auth** | JWT + bcryptjs | Stateless authentication |
+| **Auth** | Passport.js (Google OAuth 2.0) + JWT + bcryptjs | Multi-strategy stateless authentication |
 | **Security** | Helmet, express-rate-limit | HTTP hardening & DDoS mitigation |
 
 ### System Architecture
@@ -113,7 +114,7 @@ Hard Filters  = normalized(CGPA score) + normalized(Experience score)
 ┌───────────────────────────▼─────────────────────────────────┐
 │                   EXPRESS.JS API (Port 5000)                 │
 │                                                             │
-│  Helmet ──► Rate Limiter ──► JWT Middleware ──► Role Guard  │
+│  Helmet ──► Rate Limiter ──► Passport/JWT ──► Role Guard    │
 │                                    │                        │
 │          ┌─────────────────────────▼──────────────┐         │
 │          │  auth | student | job | eligibility     │         │
@@ -203,6 +204,10 @@ Create `backend/.env` with the following. **Never commit real secrets to Git.**
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | ✅ |
 | `CLOUDINARY_API_KEY` | Cloudinary API key | ✅ |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | ✅ |
+| `GOOGLE_CLIENT_ID` | Google OAuth Web Client ID | ✅ |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Web Client Secret | ✅ |
+| `FRONTEND_URL` | Deployed frontend URL (e.g., `https://...vercel.app`) | ✅ |
+| `BACKEND_URL` | Deployed backend URL (e.g., `https://...onrender.com`) | ✅ |
 | `SMTP_HOST` / `SMTP_PORT` | SMTP server e.g. `smtp.gmail.com` / `587` | Optional |
 | `SMTP_USER` / `SMTP_PASS` | SMTP credentials (Gmail App Password recommended) | Optional |
 | `USE_MOCK_LLM` | `true` to skip Gemini calls in local dev | Optional |
@@ -278,7 +283,9 @@ All protected routes require `Authorization: Bearer <token>`.
 |:---:|:---|:---|:---|
 | `GET` | `/api/health` | Server health check | Public |
 | `POST` | `/api/auth/register` | Create user + provision role profile | Public |
-| `POST` | `/api/auth/login` | Authenticate, receive JWT | Public |
+| `POST` | `/api/auth/login` | Authenticate with email, receive JWT | Public |
+| `GET`  | `/api/auth/google` | Initiate Google OAuth 2.0 flow | Public |
+| `GET`  | `/api/auth/google/callback` | Exchange code for profile, redirect with JWT | Public |
 | `POST` | `/api/student/resume` | Upload PDF → Cloudinary → Gemini → DB | `STUDENT` |
 | `GET` | `/api/student/profile` | Fetch own parsed profile | `STUDENT` |
 | `POST` | `/api/jobs` | Create job posting (AI extracts criteria) | `RECRUITER` |
@@ -299,7 +306,6 @@ All protected routes require `Authorization: Bearer <token>`.
 - **Docker + Docker Compose** — One-command local setup and environment parity across dev and production
 
 ### Authentication & User Experience
-- **OAuth 2.0 / Google Sign-In** — One-click social login for students and recruiters via Google, eliminating password friction at registration
 - **Recruiter-Built Application Forms** — Recruiters can design and publish custom forms (role-specific questions, assessments) that students fill out within the platform, replacing fragmented external tools like Google Forms
 - **Real-time WebSocket Notifications** — Instant alerts on application status changes (Shortlisted / Rejected) without polling
 

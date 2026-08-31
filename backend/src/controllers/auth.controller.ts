@@ -12,14 +12,6 @@ const SALT_ROUNDS = 12; // bcrypt work factor — 12 is the production sweet spo
 
 /**
  * Registers a new user and provisions their role-specific profile.
- *
- * @param {Request} req - Express request object containing email, password, and role.
- * @param {Response} res - Express response object.
- * 
- * @architecture
- * We manually execute a two-step creation process (User -> Profile) with a programmatic rollback
- * if the profile fails. This avoids Prisma's `$transaction` API which requires a full Replica Set
- * on MongoDB, ensuring compatibility across both local standalone databases and cloud environments.
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   const {
@@ -27,12 +19,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     password,
     role,
     adminSecret,
-    // Student-specific fields sent from Auth.tsx registration form
     firstName,
     lastName,
     college,
     cgpa,
-    // Recruiter-specific fields
     companyName,
     designation,
   } = req.body as {
@@ -94,7 +84,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     try {
       if (role === 'STUDENT') {
-        // Parse and validate CGPA — must be 0.0–10.0; default to 0 if absent/invalid
         const parsedCgpa = parseFloat(String(cgpa ?? ''));
         const safeCgpa   = (!isNaN(parsedCgpa) && parsedCgpa >= 0 && parsedCgpa <= 10)
           ? parsedCgpa
@@ -139,15 +128,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 };
 
 /**
- * Authenticates a user and issues a stateless JSON Web Token.
- *
- * @param {Request} req - Express request object containing credentials.
- * @param {Response} res - Express response object.
- *
- * @architecture
- * Uses constant-time dummy hash comparisons for invalid emails to prevent 
- * timing-based enumeration attacks. The resulting JWT payload is minimal 
- * (userId and role only) to enforce strict data isolation.
+ * Authenticates a user via email/password and issues a JWT.
+ * Uses constant-time dummy hash comparisons to prevent timing-based email enumeration.
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body as { email?: string; password?: string };
@@ -203,5 +185,132 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'An unexpected error occurred during login.' });
+  }
+};
+
+// =============================================================================
+// Google OAuth — Callback Handler
+// =============================================================================
+// Called by Passport after Google redirects back to /api/auth/google/callback.
+// At this point req.user is populated by the Passport strategy (config/passport.ts).
+// We sign our own JWT and redirect the browser to the frontend with it as a URL param.
+// =============================================================================
+export const googleCallback = (req: Request, res: Response): void => {
+  const oauthUser = req.user as {
+    userId: string;
+    email:  string;
+    role:   Role;
+    isNew:  boolean;
+  } | undefined;
+
+  if (!oauthUser) {
+    res.redirect(`${process.env['FRONTEND_URL']}/auth?error=oauth_failed`);
+    return;
+  }
+
+  const secret = process.env['JWT_SECRET']!;
+  const token  = jwt.sign(
+    { userId: oauthUser.userId, role: oauthUser.role },
+    secret,
+    { expiresIn: process.env['JWT_EXPIRES_IN'] ?? '7d' } as jwt.SignOptions,
+  );
+
+  const params = new URLSearchParams({
+    token,
+    userId: oauthUser.userId,
+    email:  oauthUser.email,
+    role:   oauthUser.role,
+  });
+
+  if (oauthUser.isNew) {
+    // Brand-new user → send to role selection setup page
+    res.redirect(`${process.env['FRONTEND_URL']}/auth/setup?${params.toString()}`);
+  } else {
+    // Existing user → pass JWT to frontend and land on dashboard
+    res.redirect(`${process.env['FRONTEND_URL']}/auth/callback?${params.toString()}`);
+  }
+};
+
+// =============================================================================
+// Google OAuth — Setup Role (POST /api/auth/setup-role)
+// =============================================================================
+// Called from /auth/setup page for brand-new OAuth users.
+// They choose their role, fill their profile, and we issue a fresh JWT.
+// =============================================================================
+export const setupOAuthRole = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { role, firstName, lastName, college, cgpa, companyName, designation } = req.body as {
+    role?: string;
+    firstName?: string;
+    lastName?: string;
+    college?: string;
+    cgpa?: number;
+    companyName?: string;
+    designation?: string;
+  };
+
+  if (role !== 'STUDENT' && role !== 'RECRUITER') {
+    res.status(400).json({ success: false, message: 'role must be STUDENT or RECRUITER.' });
+    return;
+  }
+
+  try {
+    // Update the user's permanent role in DB
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data:  { role: role as Role },
+    });
+
+    if (role === 'STUDENT') {
+      const parsedCgpa = parseFloat(String(cgpa ?? ''));
+      const safeCgpa   = (!isNaN(parsedCgpa) && parsedCgpa >= 0 && parsedCgpa <= 10) ? parsedCgpa : 0;
+
+      await prisma.studentProfile.upsert({
+        where:  { userId },
+        update: {
+          firstName: firstName?.trim() ?? '',
+          lastName:  lastName?.trim()  ?? '',
+          college:   college?.trim()   ?? '',
+          cgpa:      safeCgpa,
+        },
+        create: {
+          userId,
+          firstName:       firstName?.trim() ?? '',
+          lastName:        lastName?.trim()  ?? '',
+          college:         college?.trim()   ?? '',
+          parsedSkills:    [],
+          cgpa:            safeCgpa,
+          experienceYears: 0,
+        },
+      });
+    } else {
+      await prisma.recruiterProfile.upsert({
+        where:  { userId },
+        update: { companyName: companyName?.trim() ?? '', designation: designation?.trim() ?? '' },
+        create: { userId, companyName: companyName?.trim() ?? '', designation: designation?.trim() ?? '' },
+      });
+    }
+
+    // Issue a fresh JWT with the definitive role
+    const secret = process.env['JWT_SECRET']!;
+    const token  = jwt.sign(
+      { userId: user.id, role: user.role },
+      secret,
+      { expiresIn: process.env['JWT_EXPIRES_IN'] ?? '7d' } as jwt.SignOptions,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile setup complete.',
+      data: { token, user: { userId: user.id, email: user.email, role: user.role } },
+    });
+  } catch (error) {
+    console.error('OAuth setup error:', error);
+    res.status(500).json({ success: false, message: 'Failed to complete profile setup.' });
   }
 };

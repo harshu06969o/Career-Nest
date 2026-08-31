@@ -4,6 +4,8 @@ import Layout               from './components/Layout';
 import ProtectedRoute       from './components/ProtectedRoute';
 import Landing              from './pages/Landing';
 import Auth                 from './pages/Auth';
+import OAuthCallback        from './pages/OAuthCallback';
+import AuthSetup            from './pages/AuthSetup';
 import StudentDashboard     from './pages/student/Dashboard';
 import RecruiterDashboard   from './pages/recruiter/Dashboard';
 import AdminDashboard       from './pages/admin/Dashboard';
@@ -14,8 +16,11 @@ import AdminDashboard       from './pages/admin/Dashboard';
 // Route structure:
 //   /             → Landing (public)
 //   /auth         → Auth login/register (public; redirects if already logged in)
+//   /auth/callback→ OAuthCallback — processes JWT from Google redirect (public)
+//   /auth/setup   → AuthSetup — role/profile setup for new Google users (public)
 //   /student/*    → Student pages (STUDENT role only)
 //   /recruiter/*  → Recruiter pages (RECRUITER role only)
+//   /admin/*      → Admin pages (ADMIN role only)
 // =============================================================================
 export default function App() {
   const { isAuth, user } = useAuthStore();
@@ -42,6 +47,10 @@ export default function App() {
               )
             }
           />
+
+          {/* OAuth callback pages — always public, no redirect-if-logged-in guard */}
+          <Route path="/auth/callback" element={<OAuthCallback />} />
+          <Route path="/auth/setup"    element={<AuthSetup />} />
 
           {/* Authenticated routes */}
           <Route element={<ProtectedRoute />}>
