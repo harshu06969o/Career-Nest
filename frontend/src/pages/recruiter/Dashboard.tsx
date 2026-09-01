@@ -3,7 +3,7 @@ import {
   PlusCircle, Briefcase, Users, Loader2,
   Sparkles, ChevronDown, ChevronUp, RefreshCw,
   Search, Mail, Trash2,
-  FileText, ExternalLink, Download
+  FileText, ExternalLink, Download, X, BookOpen
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
@@ -72,6 +72,8 @@ export default function RecruiterDashboard() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   // Tracks which applicant's resume is currently being viewed (shows spinner on View btn)
   const [viewingId, setViewingId] = useState<string | null>(null);
+  // JD preview modal — null = closed, Job = open
+  const [jdPreviewJob, setJdPreviewJob] = useState<Job | null>(null);
 
 
   const [title, setTitle] = useState('');
@@ -503,6 +505,13 @@ export default function RecruiterDashboard() {
 
                     <div className="ml-auto flex items-center gap-3">
                       <button
+                        onClick={() => setJdPreviewJob(job)}
+                        className="flex items-center gap-1 text-slate-500 font-semibold hover:text-indigo-600 transition-colors text-xs"
+                      >
+                        <BookOpen size={13} />
+                        View JD
+                      </button>
+                      <button
                         onClick={() => void handleDeleteJob(job.id)}
                         className="flex items-center gap-1 text-red-500 font-semibold hover:text-red-700 transition-colors text-xs"
                       >
@@ -654,6 +663,11 @@ export default function RecruiterDashboard() {
           </div>
         )}
       </div>
+
+      {/* JD Preview Modal for recruiter */}
+      {jdPreviewJob && (
+        <RecruiterJDModal job={jdPreviewJob} onClose={() => setJdPreviewJob(null)} />
+      )}
     </div>
   );
 }
@@ -700,6 +714,114 @@ function FormField({
                    focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
                    transition-colors"
       />
+    </div>
+  );
+}
+
+// =============================================================================
+// RecruiterJDModal
+// =============================================================================
+// Read-only modal that shows the full job description for a recruiter's own
+// posting. Opened from the "View JD" button on each job card.
+// =============================================================================
+function RecruiterJDModal({ job, onClose }: { job: Job; onClose: () => void }) {
+  // Close on Escape
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  // Lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div
+      onClick={handleBackdrop}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center
+                 bg-black/50 backdrop-blur-sm animate-fade-in"
+    >
+      <div className="relative bg-white w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh]
+                      rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col
+                      animate-slide-up overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">{job.title}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Posted {new Date(job.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* Eligibility */}
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Min CGPA: <span className="text-indigo-700 font-black ml-0.5">{job.minCgpa}</span>
+            </span>
+            <span className="bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Min Experience: <span className="text-indigo-700 font-black ml-0.5">{job.minExperience} yrs</span>
+            </span>
+            <span className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-bold border',
+              job.isActive
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-slate-100 text-slate-500 border-slate-200',
+            )}>
+              {job.isActive ? '● Active' : '● Closed'}
+            </span>
+          </div>
+
+          {/* Required skills */}
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">AI-Extracted Required Skills</p>
+            <div className="flex flex-wrap gap-1.5">
+              {job.requiredSkills.map((s) => (
+                <span key={s} className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-md">
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Full JD */}
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <FileText size={11} className="text-indigo-400" />
+              Full Job Description
+            </p>
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+              {job.description}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 border-t border-slate-200 p-5 bg-white">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 bg-white
+                       hover:bg-slate-50 text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

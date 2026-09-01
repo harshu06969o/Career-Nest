@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   UploadCloud, FileText, Zap, Trophy, TrendingUp,
   Briefcase, CheckCircle, Loader2, RefreshCw, ChevronRight,
-  Info, GraduationCap, Building2
+  Info, GraduationCap, Building2, X, BookOpen, Award
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
@@ -199,6 +199,8 @@ export default function StudentDashboard() {
   const [applying,   setApplying]   = useState<string | null>(null); // jobId
   const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set()); // Track applied jobs
   const [dragOver,   setDragOver]   = useState(false);
+  // Job details modal state — null = closed, MatchedJob = open
+  const [selectedJob, setSelectedJob] = useState<MatchedJob | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
 
@@ -563,13 +565,31 @@ export default function StudentDashboard() {
                         </p>
                       )}
 
-                      <div className="flex gap-3 text-xs text-slate-500">
-                        <span className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium">
-                          Min CGPA: <span className="text-slate-800 font-bold ml-0.5">{job.minCgpa}</span>
-                        </span>
-                        <span className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium">
-                          Min Exp: <span className="text-slate-800 font-bold ml-0.5">{job.minExperience} yrs</span>
-                        </span>
+                      {/* JD preview — first 120 chars with "View Details" CTA */}
+                      {job.description && (
+                        <p className="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2">
+                          {job.description.slice(0, 120)}{job.description.length > 120 ? '…' : ''}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <div className="flex gap-2 text-xs text-slate-500">
+                          <span className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium">
+                            Min CGPA: <span className="text-slate-800 font-bold ml-0.5">{job.minCgpa}</span>
+                          </span>
+                          <span className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium">
+                            Min Exp: <span className="text-slate-800 font-bold ml-0.5">{job.minExperience} yrs</span>
+                          </span>
+                        </div>
+                        {/* View full JD button */}
+                        <button
+                          onClick={() => setSelectedJob({ matchScore, hasApplied: isApplied, job })}
+                          className="flex items-center gap-1 text-xs text-indigo-600 font-semibold
+                                     hover:text-indigo-800 hover:underline underline-offset-2 transition-colors"
+                        >
+                          <BookOpen size={11} />
+                          View Full Details
+                        </button>
                       </div>
                     </div>
 
@@ -707,6 +727,264 @@ export default function StudentDashboard() {
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Job Details Modal ──────────────────────────────────────────── */}
+      {selectedJob && (
+        <JobDetailsModal
+          match={selectedJob}
+          profile={profile}
+          applying={applying}
+          appliedJobs={appliedJobs}
+          onApply={handleApply}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// JobDetailsModal
+// =============================================================================
+// Full-screen slide-up modal (like Instahyre / Indeed) that shows the complete
+// job description, all skills with gap analysis, eligibility, and apply button.
+// Rendered via a React portal-style overlay (fixed positioning) so it overlays
+// the dashboard without disrupting scroll position.
+// =============================================================================
+function JobDetailsModal({
+  match, profile, applying, appliedJobs, onApply, onClose,
+}: {
+  match: MatchedJob;
+  profile: StudentProfile | null;
+  applying: string | null;
+  appliedJobs: Set<string>;
+  onApply: (jobId: string, title: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { matchScore, job } = match;
+  const isApplied = appliedJobs.has(job.id);
+  const canApply  = matchScore >= 50 && !isApplied;
+  const company   = job.recruiter?.recruiterProfile?.companyName;
+  const designation = job.recruiter?.recruiterProfile?.designation;
+  const { matched, missing } = analyzeSkillGap(job.requiredSkills, profile?.parsedSkills ?? []);
+
+  // Close on backdrop click
+  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  return (
+    // Backdrop
+    <div
+      onClick={handleBackdrop}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center
+                 bg-black/50 backdrop-blur-sm animate-fade-in"
+    >
+      {/* Panel */}
+      <div
+        className="relative bg-white w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh]
+                   rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col
+                   animate-slide-up overflow-hidden"
+      >
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200 flex-shrink-0">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-black text-slate-900 leading-tight">{job.title}</h2>
+            {company && (
+              <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
+                <Building2 size={13} className="text-slate-400" />
+                <span className="font-semibold text-slate-700">{company}</span>
+                {designation && <>
+                  <span className="text-slate-300">·</span>
+                  <span>{designation}</span>
+                </>}
+              </p>
+            )}
+          </div>
+          {/* Match score badge */}
+          <div className="flex flex-col items-center gap-1 flex-shrink-0">
+            <CircularProgress score={matchScore} size={60} stroke={6} />
+            <span className={cn(
+              'text-[10px] font-bold px-2 py-0.5 rounded-full',
+              matchScore >= 80
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : matchScore >= 50
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-red-50 text-red-700 border border-red-200',
+            )}>
+              {matchScore >= 80 ? 'Excellent' : matchScore >= 50 ? 'Good Fit' : 'Low Match'}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700
+                       hover:bg-slate-100 transition-colors"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* ── Scrollable body ─────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+          {/* Eligibility chips */}
+          <div className="flex flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700">
+              <Award size={12} className="text-indigo-500" />
+              Min CGPA: <span className="text-indigo-700 font-black ml-0.5">{job.minCgpa}</span>
+            </span>
+            <span className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700">
+              <Briefcase size={12} className="text-indigo-500" />
+              Min Experience: <span className="text-indigo-700 font-black ml-0.5">{job.minExperience} yrs</span>
+            </span>
+          </div>
+
+          {/* Full Job Description */}
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <FileText size={12} className="text-indigo-400" />
+              Job Description
+            </h3>
+            {/* Preserves newlines from the recruiter's textarea input */}
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+              {job.description}
+            </p>
+          </div>
+
+          {/* Required Skills with gap colouring */}
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <Zap size={12} className="text-indigo-400" />
+              Required Skills
+              <span className="ml-auto text-[10px] font-bold text-slate-400 normal-case">
+                {matched.length}/{job.requiredSkills.length} matched
+              </span>
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              {/* Show all required skills coloured by match status */}
+              {job.requiredSkills.map((skill) => {
+                const isMatched = matched.map(s => s.toLowerCase()).includes(skill.toLowerCase());
+                return (
+                  <span
+                    key={skill}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs font-semibold border',
+                      isMatched
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-red-50 text-red-600 border-red-200',
+                    )}
+                  >
+                    {isMatched ? '✓' : '✗'} {skill}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Skill gap advice (only if missing skills) */}
+          {missing.length > 0 && (
+            <div className={cn(
+              'rounded-xl p-4 space-y-3 border',
+              missing.length <= 2 ? 'bg-amber-50 border-amber-100' :
+              missing.length <= 5 ? 'bg-orange-50 border-orange-100' :
+                                    'bg-red-50 border-red-100',
+            )}>
+              <div className="flex items-center gap-2">
+                <Info size={14} className={cn(
+                  missing.length <= 2 ? 'text-amber-600' :
+                  missing.length <= 5 ? 'text-orange-600' : 'text-red-500',
+                )} />
+                <p className={cn(
+                  'text-xs font-bold uppercase tracking-wide',
+                  missing.length <= 2 ? 'text-amber-800' :
+                  missing.length <= 5 ? 'text-orange-800' : 'text-red-800',
+                )}>
+                  {missing.length} skill{missing.length !== 1 ? 's' : ''} to build — how to close the gap
+                </p>
+              </div>
+              <div className="space-y-2">
+                {missing.map((skill) => {
+                  const advice = SKILL_ADVICE[skill.toLowerCase()] ??
+                    `Build a hands-on project demonstrating ${skill} and document it on GitHub.`;
+                  return (
+                    <div key={skill} className="flex items-start gap-2.5 bg-white/70 rounded-lg p-2.5 border border-white/80">
+                      <span className={cn(
+                        'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
+                        missing.length <= 2 ? 'bg-amber-400' :
+                        missing.length <= 5 ? 'bg-orange-400' : 'bg-red-400',
+                      )} />
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 capitalize">{skill}</span>
+                        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{advice}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {matched.length === job.requiredSkills.length && job.requiredSkills.length > 0 && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
+              <CheckCircle size={15} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800">Perfect Skill Match! 🎉</p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Your resume covers every required skill. You have a strong chance of standing out.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Sticky footer with apply button ─────────────────────────── */}
+        <div className="flex-shrink-0 border-t border-slate-200 p-5 bg-white flex items-center gap-3">
+          <button
+            onClick={() => void onApply(job.id, job.title)}
+            disabled={applying === job.id || !canApply}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl',
+              'text-sm font-bold transition-all duration-150',
+              isApplied
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                : canApply
+                  ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-[0.98]'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200',
+              applying === job.id && 'opacity-70 cursor-not-allowed',
+            )}
+          >
+            {applying === job.id ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : isApplied ? (
+              <CheckCircle size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+            {isApplied ? 'Already Applied' : matchScore >= 50 ? 'Apply Now' : 'Score Below Threshold (50%)'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 bg-white
+                       hover:bg-slate-50 text-sm font-semibold transition-colors"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
