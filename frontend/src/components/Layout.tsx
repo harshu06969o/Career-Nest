@@ -57,7 +57,11 @@ export default function Layout() {
     : null;
 
   return (
-    <div className="w-full min-h-full flex flex-col bg-slate-50">
+    <div className="w-full min-h-full flex flex-col" style={{ background: 'transparent' }}>
+      {/* ── Floating background blur orbs — fixed behind everything ───────── */}
+      <div className="bg-orb bg-orb-1" aria-hidden="true" />
+      <div className="bg-orb bg-orb-2" aria-hidden="true" />
+      <div className="bg-orb bg-orb-3" aria-hidden="true" />
       {/* ── Toast provider ─────────────────────────────────────────────────── */}
       <Toaster
         position="top-center"
@@ -78,7 +82,8 @@ export default function Layout() {
       />
 
       {/* ── Top Navigation ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+      {/* True glassmorphism nav — matches elite portals like Linear, Vercel */}
+      <header className="sticky top-0 z-50 w-full border-b border-white/40" style={{ background: 'rgba(248,250,252,0.78)', backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)', boxShadow: '0 1px 0 rgba(226,232,240,0.6), 0 4px 20px rgba(99,102,241,0.05)' }}>
         <div className="max-w-7xl mx-auto w-full px-4 md:px-8 h-16 flex items-center justify-between">
 
           {/* Left: brand */}
@@ -261,7 +266,7 @@ export default function Layout() {
       </header>
 
       {/* ── Page content ───────────────────────────────────────────────────── */}
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full relative z-10">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
           <Outlet />
         </div>

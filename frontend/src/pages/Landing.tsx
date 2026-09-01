@@ -11,7 +11,7 @@ export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] w-full bg-white flex flex-col items-center justify-center
+    <div className="min-h-[calc(100vh-4rem)] w-full flex flex-col items-center justify-center
                     text-center relative overflow-hidden">
 
       {/* ── Dot-grid background ─────────────────────────────────────────── */}
@@ -32,15 +32,17 @@ export default function Landing() {
       {/* ── Hero content ─────────────────────────────────────────────────── */}
       <div className="relative z-10 max-w-4xl mx-auto px-4 animate-fade-in">
 
-        {/* AI badge */}
-        <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200
-                        rounded-full px-4 py-1.5 mb-8 text-indigo-700 text-xs font-semibold tracking-wide">
-          <Sparkles size={12} />
-          AI-Powered Placement Platform
+        {/* AI badge — glassmorphism pill */}
+        <div className="inline-flex items-center gap-2 mb-8 animate-scale-in"
+          style={{ background: 'rgba(238,242,255,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(199,210,254,0.6)', borderRadius: '9999px', padding: '0.375rem 1rem' }}>
+          <Sparkles size={12} className="text-indigo-500" />
+          <span style={{ fontFamily: 'Plus Jakarta Sans, Inter, sans-serif', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#4338ca' }}>
+            AI-Powered Placement Platform
+          </span>
         </div>
 
-        {/* Main headline */}
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.05] mb-6 text-slate-900">
+        {/* Main headline — Plus Jakarta Sans, tight tracking */}
+        <h1 style={{ fontFamily: 'Plus Jakarta Sans, Inter, sans-serif', fontSize: 'clamp(2.75rem,8vw,5rem)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.08, marginBottom: '1.5rem', color: '#0f172a' }} className="animate-view-enter">
           Your Pathway to{' '}
           <span className="gradient-text">Dream Careers</span>
         </h1>

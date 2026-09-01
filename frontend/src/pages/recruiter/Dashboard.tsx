@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback, type FormEvent } from 'react';
+import { useEffect, useState, useCallback, useMemo, type FormEvent } from 'react';
 import {
   PlusCircle, Briefcase, Users, Loader2,
   Sparkles, ChevronDown, ChevronUp, RefreshCw,
   Search, Mail, Trash2,
-  FileText, ExternalLink, Download, X, BookOpen
+  FileText, ExternalLink, Download, X, BookOpen,
+  LayoutDashboard, ClipboardList, BarChart2, Settings,
+  MessageSquare, Clock, TrendingUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
@@ -45,43 +47,49 @@ interface RealApplicant {
   };
 }
 
+// =============================================================================
+// RecruiterDashboard — Premium Redesign
+// =============================================================================
 /**
  * Recruiter Dashboard Component.
- * Primary interface for recruiters to post new jobs, manage existing active listings,
- * and review algorithmic candidate matches.
- * 
+ *
+ * Layout: Persistent left sidebar (profile + nav) + scrollable main content.
+ * Features: 3 real-data metric cards, posting list with richer cards,
+ *           ranked applicants panel, JD preview modal.
+ *
+ * ALL API calls, state, and business logic are UNCHANGED from the previous version.
+ * Only the JSX layout and visual design has been redesigned.
+ *
  * @architecture
- * Client-Side Filtering: The dashboard fetches only the active jobs belonging to the 
- * authenticated recruiter. "View Applicants" triggers a lazy, on-demand fetch to 
- * avoid loading heavy applicant datasets for jobs the user isn't currently inspecting.
- * 
- * REDESIGN: Enterprise light theme — white cards, slate borders, indigo accents.
- * All API calls, state hooks, event handlers are UNCHANGED.
+ * Client-Side Filtering: The dashboard fetches only the active jobs belonging to
+ * the authenticated recruiter. "View Applicants" triggers a lazy, on-demand fetch
+ * to avoid loading heavy applicant datasets for jobs the user isn't inspecting.
  */
 export default function RecruiterDashboard() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
+
+  // ── State (all preserved exactly) ─────────────────────────────────────────
+  const [jobs,         setJobs]         = useState<Job[]>([]);
+  const [loadingJobs,  setLoadingJobs]  = useState(true);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [formOpen,     setFormOpen]     = useState(false);
 
   // BUG FIX (Bug 3 + Bug 5): Replace mock applicants state with real API state
   const [viewingApplicantsFor, setViewingApplicantsFor] = useState<string | null>(null);
-  const [applicants, setApplicants] = useState<RealApplicant[]>([]);
-  const [loadingApplicants, setLoadingApplicants] = useState(false);
+  const [applicants,            setApplicants]            = useState<RealApplicant[]>([]);
+  const [loadingApplicants,     setLoadingApplicants]     = useState(false);
   // Tracks which applicant's resume is currently being downloaded (shows spinner)
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   // Tracks which applicant's resume is currently being viewed (shows spinner on View btn)
-  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewingId,     setViewingId]     = useState<string | null>(null);
   // JD preview modal — null = closed, Job = open
-  const [jdPreviewJob, setJdPreviewJob] = useState<Job | null>(null);
+  const [jdPreviewJob,  setJdPreviewJob]  = useState<Job | null>(null);
 
-
-  const [title, setTitle] = useState('');
+  const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
-  const [minCgpa, setMinCgpa] = useState('');
-  const [minExp, setMinExp] = useState('');
+  const [minCgpa,     setMinCgpa]     = useState('');
+  const [minExp,      setMinExp]      = useState('');
 
-
+  // ── Data fetchers (all preserved exactly) ─────────────────────────────────
   const fetchJobs = useCallback(async () => {
     setLoadingJobs(true);
     try {
@@ -96,7 +104,7 @@ export default function RecruiterDashboard() {
 
   useEffect(() => { void fetchJobs(); }, [fetchJobs]);
 
-
+  // ── Handlers (all preserved exactly) ──────────────────────────────────────
   const handlePost = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
@@ -110,8 +118,8 @@ export default function RecruiterDashboard() {
         title: title.trim(),
         description: description.trim(),
         // Send empty strings as undefined so the backend defaults to LLM extraction
-        minCgpa:      minCgpa.trim()  ? parseFloat(minCgpa)  : undefined,
-        minExperience: minExp.trim()  ? parseFloat(minExp)   : undefined,
+        minCgpa:       minCgpa.trim()  ? parseFloat(minCgpa)  : undefined,
+        minExperience: minExp.trim()   ? parseFloat(minExp)   : undefined,
       });
 
       toast.success('Job posted! AI has parsed the skills. 🤖');
@@ -124,7 +132,6 @@ export default function RecruiterDashboard() {
       setSubmitting(false);
     }
   };
-
 
   const handleDeleteJob = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this job posting? This cannot be undone.')) return;
@@ -142,7 +149,6 @@ export default function RecruiterDashboard() {
       toast.error('Failed to delete job.');
     }
   };
-
 
   const handleViewApplicants = async (jobId: string) => {
     // Toggle visibility if clicking the same job
@@ -169,14 +175,13 @@ export default function RecruiterDashboard() {
     }
   };
 
-
   // ===========================================================================
   // handleDownloadResume — Blob-based PDF Download
   // ===========================================================================
   // WHY NOT fl_attachment URL injection:
   //   Cloudinary only supports transformation flags (fl_attachment, fl_attachment:filename)
   //   on `image` and `video` resource types. Our resumes are uploaded as resource_type:
-  //   "raw", which deliberately bypasses Cloudini's transformation pipeline. Injecting
+  //   "raw", which deliberately bypasses Cloudinary's transformation pipeline. Injecting
   //   `fl_attachment` into a raw URL simply returns a 400 or serves the file unchanged.
   //
   // WHY NOT <a href={url} download>:
@@ -212,14 +217,10 @@ export default function RecruiterDashboard() {
       }
 
       // Step 2: Read as ArrayBuffer and wrap in a Blob with forced MIME type.
-      // This guarantees the browser treats the data as a PDF even if Cloudinary
-      // served it with a generic Content-Type: application/octet-stream header.
       const arrayBuffer = await response.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
 
       // Step 3: Create a fully local blob:// URL.
-      // blob:// URLs are same-origin by definition — the `download` attribute
-      // is guaranteed to work here.
       const blobUrl = window.URL.createObjectURL(blob);
 
       // Step 4: Build a sanitized filename and trigger the download.
@@ -253,11 +254,6 @@ export default function RecruiterDashboard() {
   //   instead of opening the built-in PDF viewer.
   //
   // THE FIX — same fetch → Blob → createObjectURL pattern as Download:
-  //   1. Fetch the raw PDF bytes (plain fetch, no axios, avoids JWT 401 on Cloudinary).
-  //   2. Wrap bytes in a new Blob({ type: 'application/pdf' }) to force MIME type.
-  //   3. Create a local blob:// URL — the browser's PDF viewer opens blob:// URLs
-  //      correctly regardless of what Content-Type the remote server sent.
-  //   4. Open the blob URL in a new tab.
   //   NOTE: We do NOT revoke the blob URL immediately — the new tab needs it alive
   //   while the PDF is rendering. The browser will release the memory when the tab closes.
   // ===========================================================================
@@ -284,385 +280,504 @@ export default function RecruiterDashboard() {
     }
   };
 
-  const totalApps = jobs.reduce((s, j) => s + (j._count?.applications ?? 0), 0);
+  // ── Computed metrics ───────────────────────────────────────────────────────
+  const totalApps  = jobs.reduce((s, j) => s + (j._count?.applications ?? 0), 0);
   const activeJobs = jobs.filter((j) => j.isActive).length;
 
+  // Average days since each job was posted — a real, defensible "time on market" metric
+  const avgDaysPosted = useMemo(() => {
+    if (!jobs.length) return 0;
+    const total = jobs.reduce((sum, j) => {
+      const days = Math.floor((Date.now() - new Date(j.createdAt).getTime()) / 86_400_000);
+      return sum + days;
+    }, 0);
+    return Math.round(total / jobs.length);
+  }, [jobs]);
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex gap-6 items-start w-full">
 
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="section-header">
-        <h1 className="text-2xl font-black text-slate-900">
-          Recruiter Dashboard
-        </h1>
-        <p className="text-slate-500 mt-1 text-sm">
-          Manage your job postings and review AI-scored applicants
-        </p>
-      </div>
+      {/* ══════════════════════════════════════════════════════════════════════
+          LEFT SIDEBAR — sticky profile + navigation
+      ══════════════════════════════════════════════════════════════════════ */}
+      <aside className="w-56 shrink-0 hidden lg:flex flex-col gap-3 sticky top-24 self-start">
 
-      {/* ── Stats ─────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <StatCard
-          label="Your Open Positions"
-          value={activeJobs}
-          icon={<Briefcase size={20} className="text-indigo-600" />}
-          iconBg="bg-indigo-50"
-          sub="Your active listings only"
-        />
-        <StatCard
-          label="Total Applications Received"
-          value={totalApps}
-          icon={<Users size={20} className="text-emerald-600" />}
-          iconBg="bg-emerald-50"
-          sub="Across all your postings"
-        />
-      </div>
-
-      {/* ── Post job form ─────────────────────────────────────────────────── */}
-      <div className="enterprise-card overflow-hidden">
-        <button
-          onClick={() => setFormOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-5
-                     hover:bg-slate-50 transition-colors group"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
-              <PlusCircle size={20} className="text-indigo-600" />
+        {/* Navigation links */}
+        <div className="enterprise-card p-2 flex flex-col gap-0.5">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-1.5">
+            Navigation
+          </p>
+          {[
+            { icon: <LayoutDashboard size={14} />,  label: 'Dashboard',   active: true,  soon: false },
+            { icon: <ClipboardList size={14} />,    label: 'Postings',    active: false, soon: false },
+            { icon: <Users size={14} />,            label: 'Applicants',  active: false, soon: false },
+            { icon: <MessageSquare size={14} />,    label: 'Messages',    active: false, soon: true  },
+            { icon: <BarChart2 size={14} />,        label: 'Reports',     active: false, soon: true  },
+            { icon: <Settings size={14} />,         label: 'Settings',    active: false, soon: true  },
+          ].map(({ icon, label, active, soon }) => (
+            <div
+              key={label}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-default select-none',
+                active
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : soon
+                  ? 'text-slate-300'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+              )}
+            >
+              {icon}
+              <span className="flex-1">{label}</span>
+              {soon && (
+                <span className="text-[9px] font-bold text-slate-300 border border-slate-200 rounded px-1 py-0.5">
+                  SOON
+                </span>
+              )}
             </div>
-            <div className="text-left">
-              <p className="font-bold text-slate-900 text-base">Post a New Job</p>
-              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
-                <Sparkles size={11} className="text-indigo-500" />
-                AI will automatically extract required skills from your description
-              </p>
-            </div>
-          </div>
-          {formOpen
-            ? <ChevronUp size={18} className="text-slate-400" />
-            : <ChevronDown size={18} className="text-slate-400" />
-          }
-        </button>
-
-        {formOpen && (
-          <div className="px-6 pb-6 border-t border-slate-200 bg-slate-50/50 animate-slide-up">
-            <form onSubmit={(e) => { void handlePost(e); }} className="space-y-5 pt-6">
-              <FormField
-                label="Job Title"
-                value={title}
-                onChange={setTitle}
-                placeholder="e.g. Full Stack Developer Intern"
-              />
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
-                  Job Description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={`Describe the role, responsibilities, and requirements.\n\nExample:\nWe are looking for a React/Node.js developer with 1+ year of experience...\nRequired: React, TypeScript, MongoDB, REST APIs\nMin CGPA: 7.5`}
-                  rows={6}
-                  required
-                  className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3
-                             text-sm text-slate-900 placeholder-slate-400 resize-y
-                             focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
-                             transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Conditional Float Input Parsing */}
-                <FormField
-                  label="Min CGPA (optional — leave blank for AI to decide)"
-                  value={minCgpa}
-                  onChange={setMinCgpa}
-                  placeholder="e.g. 7.0"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="10"
-                />
-                <FormField
-                  label="Min Experience (years, optional)"
-                  value={minExp}
-                  onChange={setMinExp}
-                  placeholder="e.g. 1"
-                  type="number"
-                  step="0.5"
-                  min="0"
-                />
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 flex items-center justify-center gap-2
-                             bg-indigo-600 text-white
-                             font-bold py-2.5 rounded-lg hover:bg-indigo-700
-                             active:scale-[0.99] transition-all duration-150
-                             disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm"
-                >
-                  {submitting
-                    ? <Loader2 size={16} className="animate-spin" />
-                    : <Sparkles size={16} />
-                  }
-                  {submitting ? 'Posting & Parsing…' : 'Post Job with AI'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 bg-white
-                             hover:bg-slate-50 transition-colors text-sm font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-      </div>
-
-      {/* ── Job listings ─────────────────────────────────────────────────── */}
-      <div className="enterprise-card p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-            <Briefcase size={16} className="text-indigo-500" />
-            Your Postings
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold border border-slate-200">
-              {jobs.length}
-            </span>
-          </h2>
-          <button
-            onClick={() => void fetchJobs()}
-            disabled={loadingJobs}
-            className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-            aria-label="Refresh"
-          >
-            <RefreshCw size={15} className={loadingJobs ? 'animate-spin' : ''} />
-          </button>
+          ))}
         </div>
 
-        {loadingJobs ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="skeleton h-20 rounded-xl" />
-            ))}
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Briefcase size={28} className="text-slate-400" />
+        {/* Post New Job CTA */}
+        <button
+          onClick={() => setFormOpen((v) => !v)}
+          className="flex items-center justify-center gap-2 w-full px-4 py-2.5
+                     bg-indigo-600 text-white text-sm font-bold rounded-xl
+                     hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
+        >
+          <PlusCircle size={14} />
+          Post a New Job
+        </button>
+      </aside>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MAIN CONTENT AREA
+      ══════════════════════════════════════════════════════════════════════ */}
+      <main className="flex-1 min-w-0 space-y-5 animate-fade-in">
+
+        {/* ── Page header ─────────────────────────────────────────────────── */}
+        <div className="section-header">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900">Recruiter Dashboard</h1>
+              <p className="text-slate-500 mt-0.5 text-sm">
+                Manage your job postings and review AI-scored applicants
+              </p>
             </div>
-            <p className="font-semibold text-slate-800 text-base">No jobs posted yet</p>
-            <p className="text-slate-400 text-sm mt-1">Click "Post a New Job" above to get started</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <div
-                key={job.id}
-                className="border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-300 hover:shadow-card-hover transition-all duration-200"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void fetchJobs()}
+                disabled={loadingJobs}
+                className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                aria-label="Refresh"
               >
-                {/* Job Header */}
-                <div className="p-5 bg-white">
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-slate-900 text-base truncate">{job.title}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                        Posted {new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <span className={cn(
-                      'flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border',
-                      job.isActive
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-500 border-slate-200',
-                    )}>
-                      {job.isActive ? '● Active' : '● Closed'}
-                    </span>
-                  </div>
+                <RefreshCw size={15} className={loadingJobs ? 'animate-spin' : ''} />
+              </button>
+              {/* Mobile post button (sidebar hidden on small screens) */}
+              <button
+                onClick={() => setFormOpen((v) => !v)}
+                className="lg:hidden flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white
+                           text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                <PlusCircle size={14} />
+                Post Job
+              </button>
+            </div>
+          </div>
+        </div>
 
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {job.requiredSkills.slice(0, 5).map((s) => (
-                      <span key={s} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-md">
-                        {s}
-                      </span>
-                    ))}
-                    {job.requiredSkills.length > 5 && (
-                      <span className="text-slate-400 text-xs font-medium self-center px-1">
-                        +{job.requiredSkills.length - 5} more
-                      </span>
-                    )}
+        {/* ── 3 Metric cards ──────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {loadingJobs
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="enterprise-card p-5">
+                  <div className="skeleton h-3.5 w-24 mb-4" />
+                  <div className="skeleton h-10 w-16 mb-1" />
+                  <div className="skeleton h-3 w-28" />
+                </div>
+              ))
+            : [
+                {
+                  label:   'Active Postings',
+                  value:   activeJobs,
+                  sub:     `${jobs.length - activeJobs} inactive`,
+                  icon:    <Briefcase size={18} className="text-indigo-600" />,
+                  iconBg:  'bg-indigo-50',
+                },
+                {
+                  label:   'Total Applications',
+                  value:   totalApps,
+                  sub:     'across all your postings',
+                  icon:    <Users size={18} className="text-emerald-600" />,
+                  iconBg:  'bg-emerald-50',
+                },
+                {
+                  label:   'Avg. Days Posted',
+                  value:   avgDaysPosted,
+                  sub:     'avg time on market',
+                  icon:    <Clock size={18} className="text-violet-600" />,
+                  iconBg:  'bg-violet-50',
+                },
+              ].map(({ label, value, sub, icon, iconBg }) => (
+                <div key={label} className="enterprise-card p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+                    <div className={cn('p-2 rounded-lg', iconBg)}>{icon}</div>
                   </div>
+                  <p className="text-4xl font-black text-slate-900 mb-0.5">{value}</p>
+                  <p className="text-xs text-slate-400 font-medium">{sub}</p>
+                </div>
+              ))
+          }
+        </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
-                    <span>CGPA ≥ <span className="font-bold text-slate-800">{job.minCgpa}</span></span>
-                    <span>Exp ≥ <span className="font-bold text-slate-800">{job.minExperience} yrs</span></span>
-                    <span className="font-semibold text-emerald-700">
-                      {job._count?.applications ?? 0} Applicant{(job._count?.applications ?? 0) !== 1 ? 's' : ''}
-                    </span>
+        {/* ── Post job form (collapsible) ──────────────────────────────────── */}
+        <div className="enterprise-card overflow-hidden">
+          <button
+            onClick={() => setFormOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-6 py-5
+                       hover:bg-slate-50 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
+                <PlusCircle size={20} className="text-indigo-600" />
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-slate-900 text-base">Post a New Job</p>
+                <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5 font-medium">
+                  <Sparkles size={11} className="text-indigo-500" />
+                  AI will automatically extract required skills from your description
+                </p>
+              </div>
+            </div>
+            {formOpen
+              ? <ChevronUp size={18} className="text-slate-400" />
+              : <ChevronDown size={18} className="text-slate-400" />
+            }
+          </button>
 
-                    <div className="ml-auto flex items-center gap-3">
-                      <button
-                        onClick={() => setJdPreviewJob(job)}
-                        className="flex items-center gap-1 text-slate-500 font-semibold hover:text-indigo-600 transition-colors text-xs"
-                      >
-                        <BookOpen size={13} />
-                        View JD
-                      </button>
-                      <button
-                        onClick={() => void handleDeleteJob(job.id)}
-                        className="flex items-center gap-1 text-red-500 font-semibold hover:text-red-700 transition-colors text-xs"
-                      >
-                        <Trash2 size={13} />
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => void handleViewApplicants(job.id)}
-                        className="flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors text-xs"
-                      >
-                        <Users size={13} />
-                        {viewingApplicantsFor === job.id ? 'Hide Applicants' : 'View Applicants'}
-                      </button>
-                    </div>
-                  </div>
+          {formOpen && (
+            <div className="px-6 pb-6 border-t border-slate-200 bg-slate-50/50 animate-slide-up">
+              <form onSubmit={(e) => { void handlePost(e); }} className="space-y-5 pt-6">
+                <FormField
+                  label="Job Title"
+                  value={title}
+                  onChange={setTitle}
+                  placeholder="e.g. Full Stack Developer Intern"
+                />
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                    Job Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={`Describe the role, responsibilities, and requirements.\n\nExample:\nWe are looking for a React/Node.js developer with 1+ year of experience...\nRequired: React, TypeScript, MongoDB, REST APIs\nMin CGPA: 7.5`}
+                    rows={6}
+                    required
+                    className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3
+                               text-sm text-slate-900 placeholder-slate-400 resize-y
+                               focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20
+                               transition-colors"
+                  />
                 </div>
 
-                {/* ── Real Applicants Panel ─────────────────────────────────── */}
-                {viewingApplicantsFor === job.id && (
-                  <div className="bg-slate-50 border-t border-slate-200 p-5 animate-slide-up">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <Search size={13} className="text-indigo-500" />
-                      AI Ranked Applicants
-                      {!loadingApplicants && (
-                        <span className="ml-auto text-indigo-600 font-bold normal-case text-sm">
-                          {applicants.length} {applicants.length === 1 ? 'applicant' : 'applicants'}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Conditional Float Input Parsing */}
+                  <FormField
+                    label="Min CGPA (optional — leave blank for AI to decide)"
+                    value={minCgpa}
+                    onChange={setMinCgpa}
+                    placeholder="e.g. 7.0"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                  />
+                  <FormField
+                    label="Min Experience (years, optional)"
+                    value={minExp}
+                    onChange={setMinExp}
+                    placeholder="e.g. 1"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 flex items-center justify-center gap-2
+                               bg-indigo-600 text-white
+                               font-bold py-2.5 rounded-lg hover:bg-indigo-700
+                               active:scale-[0.99] transition-all duration-150
+                               disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-sm"
+                  >
+                    {submitting
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : <Sparkles size={16} />
+                    }
+                    {submitting ? 'Posting & Parsing…' : 'Post Job with AI'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen(false)}
+                    className="px-6 py-2.5 rounded-lg border border-slate-300 text-slate-600 bg-white
+                               hover:bg-slate-50 transition-colors text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* ── Job listings ─────────────────────────────────────────────────── */}
+        <div className="enterprise-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Briefcase size={16} className="text-indigo-500" />
+              Your Postings
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-bold border border-slate-200">
+                {jobs.length}
+              </span>
+            </h2>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <TrendingUp size={13} className="text-emerald-500" />
+              <span className="font-semibold">{activeJobs} active</span>
+            </div>
+          </div>
+
+          {loadingJobs ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="skeleton h-24 rounded-xl" />
+              ))}
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Briefcase size={28} className="text-slate-400" />
+              </div>
+              <p className="font-semibold text-slate-800 text-base">No jobs posted yet</p>
+              <p className="text-slate-400 text-sm mt-1">Click "Post a New Job" above to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="border border-slate-200 rounded-xl overflow-hidden
+                             hover:border-indigo-300 hover:shadow-card-hover transition-all duration-200"
+                >
+                  {/* ── Job card header ─────────────────────────────────────── */}
+                  <div className="p-5 bg-white">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-slate-900 text-base truncate">{job.title}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                          Posted {new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <span className={cn(
+                        'flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border',
+                        job.isActive
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-slate-100 text-slate-500 border-slate-200',
+                      )}>
+                        {job.isActive ? '● Active' : '● Closed'}
+                      </span>
+                    </div>
+
+                    {/* Skills chips */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {job.requiredSkills.slice(0, 5).map((s) => (
+                        <span key={s} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-md">
+                          {s}
+                        </span>
+                      ))}
+                      {job.requiredSkills.length > 5 && (
+                        <span className="text-slate-400 text-xs font-medium self-center px-1">
+                          +{job.requiredSkills.length - 5} more
                         </span>
                       )}
-                    </h4>
+                    </div>
 
-                    {loadingApplicants ? (
-                      <div className="flex items-center justify-center py-8 gap-3 text-slate-400">
-                        <Loader2 size={20} className="animate-spin text-indigo-500" />
-                        <span className="text-sm font-medium">Loading applicants…</span>
-                      </div>
-                    ) : applicants.length === 0 ? (
-                      <div className="text-center py-10">
-                        <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Users size={22} className="text-slate-400" />
-                        </div>
-                        <p className="font-medium text-slate-600 text-sm">No applications yet</p>
-                        <p className="text-slate-400 text-xs mt-1">Students will appear here once they apply</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {applicants.map((applicant) => {
-                          const name = `${applicant.student.firstName} ${applicant.student.lastName}`.trim()
-                            || applicant.student.user.email;
-                          const score = applicant.matchScore ?? 0;
+                    {/* Metrics + actions row */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-3 border-t border-slate-100">
+                      <span>CGPA ≥ <span className="font-bold text-slate-800">{job.minCgpa}</span></span>
+                      <span>Exp ≥ <span className="font-bold text-slate-800">{job.minExperience} yrs</span></span>
+                      <span className="font-semibold text-emerald-700">
+                        {job._count?.applications ?? 0} Applicant{(job._count?.applications ?? 0) !== 1 ? 's' : ''}
+                      </span>
 
-                          return (
-                            <div
-                              key={applicant.id}
-                              className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between
-                                         hover:border-indigo-200 hover:shadow-card transition-all duration-150"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className="flex-shrink-0">
-                                  <CircularProgress score={score} size={56} stroke={5} />
-                                </div>
-                                <div>
-                                  <p className="font-bold text-slate-900 text-sm">{name}</p>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    {applicant.student.college} · <span className="font-semibold">{applicant.student.cgpa}</span> CGPA
-                                  </p>
-                                  {/* Status badge */}
-                                  <span className={cn(
-                                    'inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
-                                    applicant.status === 'PENDING'
-                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                      : applicant.status === 'SHORTLISTED'
-                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                      : 'bg-red-50 text-red-700 border border-red-200',
-                                  )}>
-                                    {applicant.status}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {/* Resume Actions — only shown if student has uploaded a resume */}
-                                {applicant.student.resumeUrl ? (
-                                  <div className="flex items-center gap-1.5">
-                                     {/* View: fetch→Blob→window.open so browser PDF viewer
-                                         opens correctly even for Cloudinary raw resources
-                                         (plain <a href> shows garbled binary text because
-                                          Cloudinary serves raw files as octet-stream) */}
-                                     <button
-                                       type="button"
-                                       disabled={viewingId === applicant.id}
-                                       onClick={() => void handleViewResume(applicant.student.resumeUrl!, applicant.id)}
-                                       className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100
-                                                  text-xs font-semibold rounded-lg transition-colors
-                                                  flex items-center gap-1.5 border border-indigo-100
-                                                  disabled:opacity-50 disabled:cursor-not-allowed"
-                                       title="View resume in new tab"
-                                     >
-                                       {viewingId === applicant.id
-                                         ? <Loader2 size={12} className="animate-spin" />
-                                         : <FileText size={12} />}
-                                       {viewingId === applicant.id ? 'Opening…' : 'View'}
-                                       {viewingId !== applicant.id && <ExternalLink size={10} />}
-                                     </button>
-                                     {/* Download: fetch→Blob→createObjectURL pattern
-                                        bypasses ALL cross-origin download restrictions */}
-                                    <button
-                                      type="button"
-                                      disabled={downloadingId === applicant.id}
-                                      onClick={() => {
-                                        const name = `${applicant.student.firstName} ${applicant.student.lastName}`.trim()
-                                          || applicant.student.user.email;
-                                        void handleDownloadResume(applicant.student.resumeUrl!, name, applicant.id);
-                                      }}
-                                      className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100
-                                                 text-xs font-semibold rounded-lg transition-colors
-                                                 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed
-                                                 border border-emerald-100"
-                                      title="Download resume as PDF"
-                                    >
-                                      {downloadingId === applicant.id
-                                        ? <Loader2 size={12} className="animate-spin" />
-                                        : <Download size={12} />
-                                      }
-                                      {downloadingId === applicant.id ? 'Saving…' : 'Download'}
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="px-3 py-1.5 bg-slate-100 text-slate-400 text-xs rounded-lg border border-slate-200">
-                                    No Resume
-                                  </span>
-                                )}
-                                {/* Contact via email */}
-                                <a
-                                  href={`mailto:${applicant.student.user.email}`}
-                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                  title={`Email ${applicant.student.user.email}`}
-                                >
-                                  <Mail size={16} />
-                                </a>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="ml-auto flex items-center gap-3">
+                        {/* View JD */}
+                        <button
+                          onClick={() => setJdPreviewJob(job)}
+                          className="flex items-center gap-1 text-slate-500 font-semibold hover:text-indigo-600 transition-colors text-xs"
+                        >
+                          <BookOpen size={13} />
+                          View JD
+                        </button>
+                        {/* Delete */}
+                        <button
+                          onClick={() => void handleDeleteJob(job.id)}
+                          className="flex items-center gap-1 text-red-500 font-semibold hover:text-red-700 transition-colors text-xs"
+                        >
+                          <Trash2 size={13} />
+                          Delete
+                        </button>
+                        {/* View Applicants */}
+                        <button
+                          onClick={() => void handleViewApplicants(job.id)}
+                          className="flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors text-xs"
+                        >
+                          <Users size={13} />
+                          {viewingApplicantsFor === job.id ? 'Hide Applicants' : 'View Applicants'}
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+                  {/* ── Real Applicants Panel ─────────────────────────────────── */}
+                  {viewingApplicantsFor === job.id && (
+                    <div className="bg-slate-50 border-t border-slate-200 p-5 animate-slide-up">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Search size={13} className="text-indigo-500" />
+                        AI Ranked Applicants
+                        {!loadingApplicants && (
+                          <span className="ml-auto text-indigo-600 font-bold normal-case text-sm">
+                            {applicants.length} {applicants.length === 1 ? 'applicant' : 'applicants'}
+                          </span>
+                        )}
+                      </h4>
+
+                      {loadingApplicants ? (
+                        <div className="flex items-center justify-center py-8 gap-3 text-slate-400">
+                          <Loader2 size={20} className="animate-spin text-indigo-500" />
+                          <span className="text-sm font-medium">Loading applicants…</span>
+                        </div>
+                      ) : applicants.length === 0 ? (
+                        <div className="text-center py-10">
+                          <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <Users size={22} className="text-slate-400" />
+                          </div>
+                          <p className="font-medium text-slate-600 text-sm">No applications yet</p>
+                          <p className="text-slate-400 text-xs mt-1">Students will appear here once they apply</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {applicants.map((applicant) => {
+                            const name = `${applicant.student.firstName} ${applicant.student.lastName}`.trim()
+                              || applicant.student.user.email;
+                            const score = applicant.matchScore ?? 0;
+
+                            return (
+                              <div
+                                key={applicant.id}
+                                className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between
+                                           hover:border-indigo-200 hover:shadow-card transition-all duration-150"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="flex-shrink-0">
+                                    <CircularProgress score={score} size={56} stroke={5} />
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-slate-900 text-sm">{name}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                      {applicant.student.college} · <span className="font-semibold">{applicant.student.cgpa}</span> CGPA
+                                    </p>
+                                    {/* Status badge */}
+                                    <span className={cn(
+                                      'inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
+                                      applicant.status === 'PENDING'
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        : applicant.status === 'SHORTLISTED'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-red-50 text-red-700 border border-red-200',
+                                    )}>
+                                      {applicant.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Resume Actions — only shown if student has uploaded a resume */}
+                                  {applicant.student.resumeUrl ? (
+                                    <div className="flex items-center gap-1.5">
+                                       {/* View: fetch→Blob→window.open so browser PDF viewer
+                                           opens correctly even for Cloudinary raw resources
+                                           (plain <a href> shows garbled binary text because
+                                            Cloudinary serves raw files as octet-stream) */}
+                                       <button
+                                         type="button"
+                                         disabled={viewingId === applicant.id}
+                                         onClick={() => void handleViewResume(applicant.student.resumeUrl!, applicant.id)}
+                                         className="px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100
+                                                    text-xs font-semibold rounded-lg transition-colors
+                                                    flex items-center gap-1.5 border border-indigo-100
+                                                    disabled:opacity-50 disabled:cursor-not-allowed"
+                                         title="View resume in new tab"
+                                       >
+                                         {viewingId === applicant.id
+                                           ? <Loader2 size={12} className="animate-spin" />
+                                           : <FileText size={12} />}
+                                         {viewingId === applicant.id ? 'Opening…' : 'View'}
+                                         {viewingId !== applicant.id && <ExternalLink size={10} />}
+                                       </button>
+                                       {/* Download: fetch→Blob→createObjectURL pattern
+                                          bypasses ALL cross-origin download restrictions */}
+                                      <button
+                                        type="button"
+                                        disabled={downloadingId === applicant.id}
+                                        onClick={() => {
+                                          const name = `${applicant.student.firstName} ${applicant.student.lastName}`.trim()
+                                            || applicant.student.user.email;
+                                          void handleDownloadResume(applicant.student.resumeUrl!, name, applicant.id);
+                                        }}
+                                        className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100
+                                                   text-xs font-semibold rounded-lg transition-colors
+                                                   flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed
+                                                   border border-emerald-100"
+                                        title="Download resume as PDF"
+                                      >
+                                        {downloadingId === applicant.id
+                                          ? <Loader2 size={12} className="animate-spin" />
+                                          : <Download size={12} />
+                                        }
+                                        {downloadingId === applicant.id ? 'Saving…' : 'Download'}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="px-3 py-1.5 bg-slate-100 text-slate-400 text-xs rounded-lg border border-slate-200">
+                                      No Resume
+                                    </span>
+                                  )}
+                                  {/* Contact via email */}
+                                  <a
+                                    href={`mailto:${applicant.student.user.email}`}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    title={`Email ${applicant.student.user.email}`}
+                                  >
+                                    <Mail size={16} />
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
 
       {/* JD Preview Modal for recruiter */}
       {jdPreviewJob && (
@@ -673,23 +788,6 @@ export default function RecruiterDashboard() {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function StatCard({
-  label, value, icon, iconBg, sub,
-}: {
-  label: string; value: number; icon: React.ReactNode; iconBg: string; sub: string;
-}) {
-  return (
-    <div className="stat-card">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-slate-500 text-sm font-medium">{label}</span>
-        <div className={cn('p-2.5 rounded-xl', iconBg)}>{icon}</div>
-      </div>
-      <p className="text-4xl font-black text-slate-900">{value}</p>
-      <p className="text-slate-400 text-xs mt-2 font-medium">{sub}</p>
-    </div>
-  );
-}
-
 function FormField({
   label, value, onChange, placeholder, type = 'text', step, min, max,
 }: {
