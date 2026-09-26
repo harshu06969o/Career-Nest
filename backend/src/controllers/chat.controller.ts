@@ -1,19 +1,34 @@
+/**
+ * @file chat.controller.ts
+ * @description Controller managing 1-on-1 real-time recruiter ↔ candidate communication channels.
+ * Enforces participant authorization, bidirectional message persistence, unread counters,
+ * and multi-channel notification dispatch.
+ *
+ * @architecture
+ * - Invariant: A conversation exists if and only if an application has been transitioned to SHORTLISTED.
+ * - Authorization: Every operation strictly verifies that `req.user.userId` equals either `recruiterId` or `studentId`.
+ * - Event Dispatch: Combines Socket.io room broadcasting with discrete user-targeted alerts for offline/cross-page synchronization.
+ */
+
 import type { Request, Response } from 'express';
 import prisma from '../config/prismaClient.js';
 import { getIO, emitToUser } from '../config/socketServer.js';
 
-// =============================================================================
-// resolveParam — narrows Express params (string | string[]) → string
-// =============================================================================
+/**
+ * Normalizes an Express route parameter to a single trimmed string.
+ * @param param - Route parameter from `req.params`.
+ */
 function resolveParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] ?? '';
   return param ?? '';
 }
 
 /**
- * Returns all conversations for the authenticated user (student or recruiter).
- * Includes application info, job title, company name, peer details, latest message,
- * and unread count.
+ * Retrieves all active conversations for the authenticated user (Student or Recruiter).
+ * Aggregates latest message snippet and calculates unread count strictly for incoming messages.
+ *
+ * @route GET /api/chat/conversations
+ * @access Protected (JWT)
  */
 export const getConversations = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -26,10 +41,7 @@ export const getConversations = async (req: Request, res: Response): Promise<voi
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
-        OR: [
-          { recruiterId: userId },
-          { studentId: userId },
-        ],
+        OR: [{ recruiterId: userId }, { studentId: userId }],
       },
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -90,13 +102,16 @@ export const getConversations = async (req: Request, res: Response): Promise<voi
       data: conversations,
     });
   } catch (error) {
-    console.error('[getConversations] Error:', error);
+    console.error('[getConversations] Database query failed:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversations.' });
   }
 };
 
 /**
- * Returns a single conversation by ID with full details.
+ * Fetches a single conversation by ID with complete candidate and job context.
+ *
+ * @route GET /api/chat/conversations/:conversationId
+ * @access Protected (Participant Only)
  */
 export const getConversationById = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -186,14 +201,17 @@ export const getConversationById = async (req: Request, res: Response): Promise<
       data: conversation,
     });
   } catch (error) {
-    console.error('[getConversationById] Error:', error);
+    console.error('[getConversationById] Database query failed:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch conversation.' });
   }
 };
 
 /**
- * Returns all messages for a specific conversation.
- * Verifies that the requester is a participant (recruiter or student).
+ * Retrieves chronological message history for a conversation.
+ * Enforces participant authorization and returns sender profiles for avatar rendering.
+ *
+ * @route GET /api/chat/conversations/:conversationId/messages
+ * @access Protected (Participant Only)
  */
 export const getMessages = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -253,14 +271,17 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
       data: messages,
     });
   } catch (error) {
-    console.error('[getMessages] Error:', error);
+    console.error('[getMessages] Message history retrieval failed:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch messages.' });
   }
 };
 
 /**
- * Sends a message in a conversation.
- * Persists to PostgreSQL, broadcasts to Socket.io room, and sends notification to peer.
+ * Persists a new message to PostgreSQL, advances the conversation timestamp,
+ * broadcasts in real-time via Socket.io to the room, and logs an in-app notification.
+ *
+ * @route POST /api/chat/conversations/:conversationId/messages
+ * @access Protected (Participant Only)
  */
 export const sendMessage = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -321,7 +342,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       },
     });
 
-    // Touch conversation updatedAt
+    // Advance conversation updatedAt timestamp for recency sorting
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
@@ -329,7 +350,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
 
     const recipientId = conversation.recruiterId === userId ? conversation.studentId : conversation.recruiterId;
 
-    // Create in-app notification for the recipient
+    // Provision an in-app notification for the recipient
     const senderRole = req.user.role === 'RECRUITER' ? 'Recruiter' : 'Candidate';
     const notif = await prisma.notification.create({
       data: {
@@ -343,14 +364,15 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       },
     });
 
-    // Emit live to room and recipient
+    // Broadcast live to room subscribers
     try {
       const io = getIO();
       io.to(`conversation:${conversationId}`).emit('chat:message', message);
     } catch (ioErr) {
-      console.warn('[sendMessage] Socket emission warning:', ioErr);
+      console.warn('[sendMessage] Socket broadcast skipped (server offline):', ioErr);
     }
 
+    // Direct event dispatch for global notification badge increment
     emitToUser(recipientId, 'notification:new', notif);
     emitToUser(recipientId, 'chat:unread_increment', { conversationId });
 
@@ -359,7 +381,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
       data: message,
     });
   } catch (error) {
-    console.error('[sendMessage] Error:', error);
+    console.error('[sendMessage] Persistence failed:', error);
     res.status(500).json({ success: false, message: 'Failed to send message.' });
   }
 };

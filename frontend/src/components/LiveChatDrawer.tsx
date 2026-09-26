@@ -1,7 +1,9 @@
-// src/components/LiveChatDrawer.tsx
-// Elite-Grade 1-on-1 Real-time Chat Drawer for Students & Recruiters
-// Benchmarked against Internshala, LinkedIn Recruiter & Wellfound
-// Powered by Socket.io: live streaming, presence dots, typing indicators, read receipts, and URL parsing.
+/**
+ * @file LiveChatDrawer.tsx
+ * @description Real-Time 1-on-1 Recruiter ↔ Candidate Messaging Drawer.
+ * Built with Socket.io streaming, typing wave relays, optimistic message delivery,
+ * double checkmark read receipts, presence monitoring, date grouping, and auto-URL parsing.
+ */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {

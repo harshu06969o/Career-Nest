@@ -56,7 +56,7 @@ const TTL = {
 // Graceful Redis wrapper
 // =============================================================================
 // ALL Redis operations are wrapped in this helper. If Redis is temporarily
-// unavailable, it logs and returns null — the caller falls through to MongoDB.
+// unavailable, it logs and returns null — the caller falls through to PostgreSQL.
 // This ensures zero cascading failures: Redis down ≠ API down.
 // =============================================================================
 async function safeRedisGet(key: string): Promise<string | null> {
@@ -146,7 +146,7 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  // ── Step 2: Persist to MongoDB ─────────────────────────────────────────────
+  // ── Step 2: Persist to PostgreSQL ──────────────────────────────────────────
   let job: Awaited<ReturnType<typeof prisma.job.create>>;
   try {
     job = await prisma.job.create({
@@ -180,7 +180,7 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
 
   // ── Step 4: Invalidate the all-jobs list cache ─────────────────────────────
   // The cached list is now stale. DEL forces the next GET /api/jobs to
-  // rebuild from MongoDB with the new job included.
+  // rebuild from PostgreSQL with the new job included.
   await safeRedisDel(CACHE_KEYS.allJobs);
 
   res.status(201).json({
@@ -198,8 +198,8 @@ export const createJob = async (req: Request, res: Response): Promise<void> => {
  *
  * @architecture
  * Cache-first read strategy utilizing Redis. If a cache miss occurs, data is fetched 
- * from MongoDB, cached, and returned. Graceful degradation ensures that if the Redis 
- * layer is unavailable, queries safely fall through directly to MongoDB.
+ * from PostgreSQL, cached, and returned. Graceful degradation ensures that if the Redis 
+ * layer is unavailable, queries safely fall through directly to PostgreSQL.
  */
 export const getAllJobs = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -220,7 +220,7 @@ export const getAllJobs = async (req: Request, res: Response): Promise<void> => 
     return;
   }
 
-  // ── Cache Miss: query MongoDB ──────────────────────────────────────────────
+  // ── Cache Miss: query PostgreSQL ───────────────────────────────────────────
   console.log('[Cache] MISS jobs:all — querying DB');
   try {
     const jobs = await prisma.job.findMany({
@@ -473,8 +473,19 @@ export const getAdminStats = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
- * Updates application status (PENDING, SHORTLISTED, REJECTED).
- * When SHORTLISTED, automatically initializes a Conversation and notifies the student via in-app notification & WebSocket.
+ * Updates application status (`PENDING`, `SHORTLISTED`, `REJECTED`).
+ *
+ * @state_transitions
+ * - SHORTLISTED:
+ *   1. Upserts 1-on-1 `Conversation` connecting candidate and recruiter.
+ *   2. Provisions persistent `APPLICATION_SHORTLISTED` notification.
+ *   3. Emits `application:status_changed` and `notification:new` over WebSocket for instant UI celebration and unlocked chat drawer.
+ * - REJECTED:
+ *   1. Provisions courteous `APPLICATION_REJECTED` notification.
+ *   2. Emits `application:status_changed` over WebSocket for instant state synchronization.
+ *
+ * @authorization Strictly restricted to the job's creator (`recruiterId === userId`) or system `ADMIN`.
+ * @route PATCH /api/jobs/applications/:id/status
  */
 export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {

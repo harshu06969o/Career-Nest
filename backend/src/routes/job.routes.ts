@@ -31,7 +31,7 @@ router.post(
 // GET /api/jobs
 // =============================================================================
 // Returns ALL active job listings. Used by Student feed and Admin overview.
-// Cache-first: Redis HIT → O(1), Redis MISS → MongoDB + prime cache.
+// Cache-first: Redis HIT → O(1), Redis MISS → PostgreSQL + prime cache.
 //
 // Security chain: verifyToken → getAllJobs
 // =============================================================================
@@ -65,7 +65,7 @@ router.get(
 // GET /api/jobs/admin-stats
 // =============================================================================
 // Returns real-time platform counts: total students, total applications,
-// and active job count. Admin-only. No caching — always fresh from MongoDB.
+// and active job count. Admin-only. No caching — always fresh from PostgreSQL.
 //
 // ⚠ ROUTE ORDER CRITICAL: Must appear BEFORE /:jobId and /:id param routes
 //   so Express matches the literal string "admin-stats" here, not as a jobId.

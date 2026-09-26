@@ -208,7 +208,7 @@ export async function sendApplicationConfirmation(
     );
   } catch (error) {
     // Log the failure but do NOT rethrow — email is non-critical infrastructure.
-    // The application record is already committed to MongoDB at this point.
+    // The application record is already committed to PostgreSQL at this point.
     console.error('[Notification] Failed to send confirmation email:', error);
   }
 }

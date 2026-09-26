@@ -1,16 +1,32 @@
+/**
+ * @file notification.controller.ts
+ * @description In-App Notification Hub controller.
+ * Powers real-time alert aggregation, read-state transitions, batch clearance,
+ * and individual item dismissal for Students, Recruiters, and Platform Admins.
+ *
+ * @architecture
+ * - Scoping: All operations strictly scope mutations and queries to `req.user.userId`.
+ * - Query Efficiency: Combines indexed retrieval (`[userId, isRead]` index in PostgreSQL)
+ *   with concurrent total unread count calculation via `Promise.all`.
+ */
+
 import type { Request, Response } from 'express';
 import prisma from '../config/prismaClient.js';
 
-// =============================================================================
-// resolveParam — narrows Express params (string | string[]) → string
-// =============================================================================
+/**
+ * Normalizes an Express route parameter to a single trimmed string.
+ * @param param - Route parameter from `req.params`.
+ */
 function resolveParam(param: string | string[] | undefined): string {
   if (Array.isArray(param)) return param[0] ?? '';
   return param ?? '';
 }
 
 /**
- * Returns latest 30 notifications for the logged-in user, along with the total unreadCount.
+ * Retrieves the latest 30 notifications for the authenticated user and computes unread count.
+ *
+ * @route GET /api/notifications
+ * @access Protected (JWT)
  */
 export const getNotifications = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -40,13 +56,16 @@ export const getNotifications = async (req: Request, res: Response): Promise<voi
       },
     });
   } catch (error) {
-    console.error('[getNotifications] Error:', error);
+    console.error('[getNotifications] Query failed:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch notifications.' });
   }
 };
 
 /**
  * Marks a specific notification as read.
+ *
+ * @route PATCH /api/notifications/:id/read
+ * @access Protected (Owner Only)
  */
 export const markAsRead = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -70,13 +89,16 @@ export const markAsRead = async (req: Request, res: Response): Promise<void> => 
 
     res.status(200).json({ success: true, message: 'Notification marked as read.' });
   } catch (error) {
-    console.error('[markAsRead] Error:', error);
+    console.error('[markAsRead] State transition failed:', error);
     res.status(500).json({ success: false, message: 'Failed to update notification.' });
   }
 };
 
 /**
  * Marks all unread notifications for the user as read.
+ *
+ * @route PATCH /api/notifications/mark-all-read
+ * @access Protected (Owner Only)
  */
 export const markAllAsRead = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -94,13 +116,16 @@ export const markAllAsRead = async (req: Request, res: Response): Promise<void> 
 
     res.status(200).json({ success: true, message: 'All notifications marked as read.' });
   } catch (error) {
-    console.error('[markAllAsRead] Error:', error);
+    console.error('[markAllAsRead] Batch update failed:', error);
     res.status(500).json({ success: false, message: 'Failed to update notifications.' });
   }
 };
 
 /**
- * Deletes a specific notification for the user.
+ * Permanently dismisses/deletes an individual notification.
+ *
+ * @route DELETE /api/notifications/:id
+ * @access Protected (Owner Only)
  */
 export const deleteNotification = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -123,8 +148,7 @@ export const deleteNotification = async (req: Request, res: Response): Promise<v
 
     res.status(200).json({ success: true, message: 'Notification deleted.' });
   } catch (error) {
-    console.error('[deleteNotification] Error:', error);
+    console.error('[deleteNotification] Deletion failed:', error);
     res.status(500).json({ success: false, message: 'Failed to delete notification.' });
   }
 };
-

@@ -152,14 +152,6 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   const fileInfo = req.file as Express.Multer.File & { secure_url?: string; path?: string };
   const resumeUrl = fileInfo.secure_url ?? fileInfo.path ?? '';
 
-  console.log('[Upload] req.file fields:', {
-    path:        fileInfo.path,
-    secure_url:  fileInfo.secure_url,
-    filename:    fileInfo.filename,
-    originalname: fileInfo.originalname,
-    mimetype:    fileInfo.mimetype,
-  });
-
   if (!resumeUrl || !resumeUrl.startsWith('http')) {
     console.error('[Upload] Could not resolve a valid Cloudinary URL from req.file');
     res.status(500).json({ success: false, message: 'Upload succeeded but could not get file URL. Please try again.' });
@@ -209,10 +201,16 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   });
 };
 
-// =============================================================================
-// RECRUITER PROFILE CONTROLLERS
-// =============================================================================
-
+/**
+ * Retrieves the recruiter profile associated with the authenticated user context.
+ *
+ * @param {Request} req - Express request object containing verified JWT user context.
+ * @param {Response} res - Express response object.
+ *
+ * @throws 401 Unauthorized if request context lacks verified JWT token.
+ * @throws 404 Not Found if recruiter profile record has not been provisioned.
+ * @throws 500 Internal Server Error on database connection or query failure.
+ */
 export const getRecruiterProfile = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -243,6 +241,14 @@ export const getRecruiterProfile = async (req: Request, res: Response): Promise<
   }
 };
 
+/**
+ * Updates organizational metadata (company name, designation) for the authenticated recruiter.
+ *
+ * @param {Request} req - Express request containing sanitized partial updates in req.body.
+ * @param {Response} res - Express response returning the mutated entity.
+ *
+ * @complexity Time: O(1) indexed lookup on unique foreign key `userId`. Space: O(1).
+ */
 export const updateRecruiterProfile = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });

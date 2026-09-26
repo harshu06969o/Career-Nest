@@ -1,12 +1,3 @@
-// src/workers/resumeParser.worker.ts
-// BullMQ Worker — runs in the SAME Node process as the server but executes
-// asynchronously via the Redis queue. The HTTP response for /upload-resume
-// returns BEFORE this worker does any work.
-//
-// Job payload: { resumeUrl: string, userId: string }
-// On success:  emits "resume:parsed"  via Socket.io to the user
-// On failure:  emits "resume:parse-failed" via Socket.io to the user
-
 import { Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import dotenv from 'dotenv';
@@ -20,10 +11,21 @@ const redisUrl = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 export interface ResumeParseJobData {
   resumeUrl: string;
-  userId:    string;
+  userId: string;
 }
 
-// ── Processor function ────────────────────────────────────────────────────────
+/**
+ * Background consumer executing asynchronous resume parsing pipelines decoupled from HTTP request loops.
+ *
+ * @architecture
+ * - Ingestion: Jobs submitted to 'resume-parse' BullMQ queue during `/api/student/resume` upload.
+ * - Extraction: Fetches Cloudinary raw binary stream via `pdf-parse` buffer reader.
+ * - LLM Transformation: Executes Gemini 2.0 Flash structured generation with deterministic JSON schema.
+ * - Persistence: Atomic Prisma upsert storing normalized skills array, CGPA, and experience.
+ * - Event Dispatch: Full-duplex WebSocket notification (`resume:parsed`) dispatched directly to user socket room.
+ *
+ * @concurrency 5 concurrent workers per Node.js process.
+ */
 async function processResumeJob(job: Job<ResumeParseJobData>): Promise<void> {
   const { resumeUrl, userId } = job.data;
   console.log(`[Worker] Processing job ${job.id} for user ${userId}`);
@@ -107,7 +109,11 @@ async function processResumeJob(job: Job<ResumeParseJobData>): Promise<void> {
   console.log(`[Worker] Job ${job.id} completed — notified user ${userId}`);
 }
 
-// ── Worker instance ───────────────────────────────────────────────────────────
+/**
+ * Instantiates and wires the BullMQ worker for the 'resume-parse' queue.
+ *
+ * @returns {Worker<ResumeParseJobData>} The configured BullMQ Worker instance.
+ */
 export function createResumeWorker(): Worker<ResumeParseJobData> {
   const worker = new Worker<ResumeParseJobData>(
     'resume-parse',

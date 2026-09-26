@@ -1,7 +1,14 @@
-// src/config/socketServer.ts
-// Creates and configures the Socket.io server.
-// Provides real-time event broadcasting, 1-on-1 chat room dispatch,
-// typing indicators, read receipts, and live online presence tracking.
+/**
+ * @file socketServer.ts
+ * @description Real-Time WebSocket Gateway powered by Socket.io.
+ * Orchestrates multi-tenant rooms, 1-on-1 direct messaging, live typing relays,
+ * read receipts, and O(1) in-memory presence tracking across distributed clients.
+ *
+ * @architecture
+ * - Authentication: JWT verification during WebSocket handshake with strict error isolation.
+ * - Room Partitioning: Dedicated rooms per user (`user:<userId>`) and per hiring conversation (`conversation:<conversationId>`).
+ * - Presence Tracking: In-memory hash set mapping user IDs to active socket connections. Emits presence updates only on state boundary transitions (0 -> 1 or 1 -> 0).
+ */
 
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, type Socket } from 'socket.io';
@@ -10,13 +17,26 @@ import prisma from './prismaClient.js';
 
 let io: SocketIOServer | null = null;
 
-// Maps userId → Set of active socket IDs
+/**
+ * Tracks active socket connections per user.
+ * Key: userId, Value: Set of connected socket IDs (supports multi-device sessions).
+ */
 const userSockets = new Map<string, Set<string>>();
 
+/**
+ * Checks whether a given user has at least one active WebSocket connection.
+ * @param userId - Unique user identifier.
+ * @returns boolean indicating real-time online status.
+ */
 export function isUserOnline(userId: string): boolean {
   return (userSockets.get(userId)?.size ?? 0) > 0;
 }
 
+/**
+ * Batch-evaluates the online presence status for a collection of user IDs.
+ * @param userIds - Array of target user identifiers.
+ * @returns Key-value map of userId to online boolean status.
+ */
 export function getOnlineUsers(userIds: string[]): Record<string, boolean> {
   const result: Record<string, boolean> = {};
   for (const id of userIds) {
@@ -25,7 +45,13 @@ export function getOnlineUsers(userIds: string[]): Record<string, boolean> {
   return result;
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+/**
+ * Initializes and binds the Socket.io server to the existing HTTP listener.
+ * Configures CORS, security middleware, and bidirectional event listeners.
+ *
+ * @param httpServer - Active Node.js HTTP server instance.
+ * @returns Configured SocketIOServer instance.
+ */
 export function initSocketServer(httpServer: HttpServer): SocketIOServer {
   const allowedOrigins = [
     process.env['FRONTEND_URL'],
@@ -53,13 +79,13 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
     transports: ['websocket', 'polling'],
   });
 
-  // ── JWT auth middleware ────────────────────────────────────────────────────
+  // ── Authentication Middleware: Verify JWT before connection establishment ───
   io.use((socket: Socket, next) => {
     const authHeader = socket.handshake.headers['authorization'];
-    const token = (socket.handshake.auth['token'] || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)) as string | undefined;
+    const token = (socket.handshake.auth['token'] ||
+      (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)) as string | undefined;
 
     if (!token) {
-      console.warn(`[Socket.io Auth] Connection rejected: No token provided (socket ${socket.id})`);
       return next(new Error('Authentication token missing'));
     }
 
@@ -70,47 +96,41 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       const payload = jwt.verify(token, secret) as { userId: string };
       (socket as Socket & { userId: string }).userId = payload.userId;
       next();
-    } catch (err: unknown) {
-      console.warn(`[Socket.io Auth] Token verification failed: ${(err as Error).message}`);
+    } catch {
       next(new Error('Invalid or expired token'));
     }
   });
 
-  // ── Connection handler ────────────────────────────────────────────────────
+  // ── Connection Handler ──────────────────────────────────────────────────────
   io.on('connection', (socket) => {
     const userId = (socket as Socket & { userId: string }).userId;
-    console.log(`[Socket.io] User ${userId} connected — socket ${socket.id}`);
 
-    // Join personal user room for direct targeting
+    // Join personal user room for targeted notifications
     socket.join(`user:${userId}`);
 
     const isFirstConnection = !userSockets.has(userId) || (userSockets.get(userId)?.size ?? 0) === 0;
     if (!userSockets.has(userId)) userSockets.set(userId, new Set());
     userSockets.get(userId)!.add(socket.id);
 
-    // Broadcast presence if newly online
+    // Broadcast presence update only when transitioning from 0 to 1 active session
     if (isFirstConnection) {
       io?.emit('presence:update', { userId, isOnline: true });
     }
 
-    // ── Room Management for Live Chat ───────────────────────────────────────
+    // ── Room Join / Leave ─────────────────────────────────────────────────────
     socket.on('chat:join', (data: { conversationId?: string }) => {
       if (data?.conversationId) {
-        const roomName = `conversation:${data.conversationId}`;
-        socket.join(roomName);
-        console.log(`[Socket.io] User ${userId} joined ${roomName}`);
+        socket.join(`conversation:${data.conversationId}`);
       }
     });
 
     socket.on('chat:leave', (data: { conversationId?: string }) => {
       if (data?.conversationId) {
-        const roomName = `conversation:${data.conversationId}`;
-        socket.leave(roomName);
-        console.log(`[Socket.io] User ${userId} left ${roomName}`);
+        socket.leave(`conversation:${data.conversationId}`);
       }
     });
 
-    // ── Live Typing Indicator ───────────────────────────────────────────────
+    // ── Live Typing Relay ─────────────────────────────────────────────────────
     socket.on('chat:typing', (data: { conversationId: string; isTyping: boolean }) => {
       if (data?.conversationId) {
         socket.to(`conversation:${data.conversationId}`).emit('chat:peer_typing', {
@@ -121,7 +141,7 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       }
     });
 
-    // ── Real-Time Read Receipt Dispatch ──────────────────────────────────────
+    // ── Read Receipt Synchronization ──────────────────────────────────────────
     socket.on('chat:mark_read', async (data: { conversationId: string }) => {
       if (!data?.conversationId) return;
       try {
@@ -146,55 +166,65 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
           });
         }
       } catch (err) {
-        console.error('[Socket.io] chat:mark_read error:', err);
+        console.error('[Socket.io] Read receipt persistence failed:', err);
       }
     });
 
-    // ── Presence Query ───────────────────────────────────────────────────────
+    // ── Presence Query Protocol ───────────────────────────────────────────────
     socket.on('presence:query', (data: { userIds: string[] }, callback) => {
       if (typeof callback === 'function' && Array.isArray(data?.userIds)) {
         callback(getOnlineUsers(data.userIds));
       }
     });
 
-    // ── Disconnect handler ───────────────────────────────────────────────────
-    socket.on('disconnect', (reason) => {
+    // ── Disconnection Handler ─────────────────────────────────────────────────
+    socket.on('disconnect', () => {
       userSockets.get(userId)?.delete(socket.id);
       if (userSockets.get(userId)?.size === 0) {
         userSockets.delete(userId);
         io?.emit('presence:update', { userId, isOnline: false });
       }
-      console.log(`[Socket.io] User ${userId} disconnected (${reason}) — socket ${socket.id}`);
     });
   });
 
-  console.log('[Socket.io] Server initialised with CORS origins:', allowedOrigins);
   return io;
 }
 
-// ── Getters & Emitters ────────────────────────────────────────────────────────
+/**
+ * Accessor for the active SocketIOServer instance.
+ * Throws if accessed prior to server initialization.
+ */
 export function getIO(): SocketIOServer {
-  if (!io) throw new Error('Socket.io not initialised. Call initSocketServer first.');
+  if (!io) throw new Error('Socket.io not initialized. Call initSocketServer first.');
   return io;
 }
 
-/** Emit an event to every socket belonging to a specific user. */
+/**
+ * Dispatches an event directly to every active socket belonging to a target user.
+ * If the user has multiple tabs/devices open, all connections receive the event.
+ *
+ * @param userId - Target recipient's unique identifier.
+ * @param event - Event name string.
+ * @param data - Event payload.
+ */
 export function emitToUser(userId: string, event: string, data: unknown): void {
   const socketIds = userSockets.get(userId);
   if (!socketIds || socketIds.size === 0) {
-    console.log(`[Socket.io] User ${userId} not currently connected — event "${event}" queued for next sync`);
     return;
   }
   const ioInstance = getIO();
   for (const sid of socketIds) {
     ioInstance.to(sid).emit(event, data);
   }
-  console.log(`[Socket.io] Emitted "${event}" to user ${userId} (${socketIds.size} socket(s))`);
 }
 
-/** Broadcast an event to all connected sockets (announcements). */
+/**
+ * Broadcasts an announcement event globally to all connected clients.
+ *
+ * @param event - Event identifier string.
+ * @param data - Broadcast payload.
+ */
 export function broadcastGlobal(event: string, data: unknown): void {
   const ioInstance = getIO();
   ioInstance.emit(event, data);
-  console.log(`[Socket.io] Global broadcast "${event}" sent`);
 }

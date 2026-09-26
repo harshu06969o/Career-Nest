@@ -101,7 +101,22 @@ async function fetchActiveJobs(): Promise<JobRecord[]> {
   return jobs as unknown as JobRecord[];
 }
 
-// POST /api/eligibility/apply/:jobId
+/**
+ * Processes a student job application through a multi-stage validation, scoring, and notification pipeline.
+ *
+ * @architecture
+ * 1. Preflight Validation: Asserts student profile and uploaded resume existence.
+ * 2. Deterministic Scoring: Evaluates candidate skills & criteria via the in-process Jaccard matcher.
+ * 3. Threshold Guard: Enforces minimum qualification bar (`APPLY_THRESHOLD = 40%`) prior to persistence.
+ * 4. Idempotency & Concurrency: Relies on PostgreSQL unique compound constraint `(studentId, jobId)` 
+ *    to prevent duplicate applications.
+ * 5. Cache Invalidation: Asynchronously purges `jobs:all` cache to update platform applicant counts.
+ * 6. Dual-Channel Alerts: Triggers transactional email notification and pushes real-time WebSocket
+ *    events (`recruiter:new_applicant` and `notification:new`) to recruiter room.
+ *
+ * @param {Request} req - Express request with `req.params.jobId` and authenticated student context.
+ * @param {Response} res - Express response with persisted application payload and match score.
+ */
 export const checkAndApply = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });

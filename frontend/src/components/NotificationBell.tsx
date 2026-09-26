@@ -1,7 +1,10 @@
-// src/components/NotificationBell.tsx
-// Elite-Grade In-App Real-time Notification Bell & Popover
-// Benchmarked against LinkedIn, GitHub & Internshala
-// Live WebSocket updates, Web Audio chime synthesis, filter tabs, instant mark-all-read & dismiss.
+/**
+ * @file NotificationBell.tsx
+ * @description Real-Time In-App Notification Center & Popover.
+ * Synchronizes incoming system and hiring events live via Socket.io,
+ * synthesizes acoustic notifications via the Web Audio API,
+ * and enables instantaneous unread filtering, batch read, and dismissal.
+ */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
