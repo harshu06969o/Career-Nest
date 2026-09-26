@@ -3,11 +3,14 @@ import { Link, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import {
   GraduationCap, Briefcase, LayoutDashboard, LogOut,
-  Menu, X, LogIn, UserPlus, Shield
+  Menu, X, LogIn, UserPlus, Shield, MessageSquare
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useChatStore } from '../store/chatStore';
 import { cn } from '../lib/cn';
 import ProfilePanel from './ProfilePanel';
+import NotificationBell from './NotificationBell';
+import LiveChatDrawer from './LiveChatDrawer';
 
 /**
  * Global application shell component.
@@ -26,6 +29,7 @@ interface NavLink {
 
 export default function Layout() {
   const { isAuth, user, logout } = useAuthStore();
+  const { isOpen: isChatOpen, activeConversationId, openChat, closeChat } = useChatStore();
   const navigate          = useNavigate();
   const location          = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,6 +135,22 @@ export default function Layout() {
 
                 <div className="h-5 w-px bg-slate-200 mx-1" />
 
+                {/* Real-time Messages Action */}
+                <button
+                  type="button"
+                  onClick={() => openChat(null)}
+                  className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+                  title="Live 1-on-1 Messages"
+                  aria-label="Open messages"
+                >
+                  <MessageSquare size={19} />
+                </button>
+
+                {/* Real-time In-App Notification Bell */}
+                <NotificationBell onOpenChat={(convId) => openChat(convId ?? null)} />
+
+                <div className="h-5 w-px bg-slate-200 mx-1" />
+
                 {/* Avatar Button */}
                 <button
                   onClick={() => setIsProfileOpen(true)}
@@ -174,14 +194,17 @@ export default function Layout() {
             )}
           </div>
 
-          {/* Mobile: hamburger */}
-          <button
-            className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {/* Mobile: NotificationBell + hamburger */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            {isAuth && <NotificationBell onOpenChat={(convId) => openChat(convId ?? null)} />}
+            <button
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile drawer */}
@@ -277,6 +300,15 @@ export default function Layout() {
         isOpen={isProfileOpen} 
         onClose={() => setIsProfileOpen(false)} 
       />
+
+      {/* Global 1-on-1 Live Chat Drawer */}
+      {isAuth && (
+        <LiveChatDrawer
+          isOpen={isChatOpen}
+          onClose={closeChat}
+          initialConversationId={activeConversationId}
+        />
+      )}
     </div>
   );
 }

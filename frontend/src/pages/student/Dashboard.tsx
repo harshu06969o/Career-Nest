@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   UploadCloud, FileText, Zap, Trophy, TrendingUp,
   Briefcase, CheckCircle, Loader2, RefreshCw, ChevronRight,
   Info, GraduationCap, Building2, X, BookOpen, Award,
   Target, LayoutDashboard, BarChart2, Lightbulb,
-  Star, Clock, ExternalLink, AlertCircle,
+  Star, Clock, ExternalLink, AlertCircle, MessageSquare,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
 import { getSocket } from '../../lib/socket';
 import CircularProgress from '../../components/CircularProgress';
 import ResumeAnalyzing from '../../components/ResumeAnalyzing';
+import NotificationBell, { playNotificationChime } from '../../components/NotificationBell';
+import { useChatStore } from '../../store/chatStore';
 import { cn } from '../../lib/cn';
 
 // =============================================================================
@@ -29,6 +32,8 @@ interface StudentProfile {
 interface MatchedJob {
   matchScore: number;
   hasApplied: boolean;
+  applicationStatus?: string | null;
+  conversationId?: string | null;
   job: {
     id:             string;
     title:          string;
@@ -201,6 +206,17 @@ export default function StudentDashboard() {
   const [matchFilter,    setMatchFilter]    = useState<'all' | 'eligible' | 'applied'>('all');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Real-time Chat state
+  const openChat = useChatStore((s) => s.openChat);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const qConvId = searchParams.get('conversationId');
+    if (qConvId) {
+      openChat(qConvId);
+    }
+  }, [searchParams, openChat]);
+
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchProfile = useCallback(async () => {
@@ -254,12 +270,26 @@ export default function StudentDashboard() {
       toast.error(data.message ?? 'AI parsing failed. Please try again.');
     };
 
+    const onStatusChanged = (data: { applicationId: string; jobTitle: string; status: string; conversationId?: string }) => {
+      console.log('[Dashboard] Received application:status_changed via WebSocket:', data);
+      if (data.status === 'SHORTLISTED') {
+        toast.success(`🎉 Congratulations! You have been Shortlisted for "${data.jobTitle}"! Live recruiter chat is now unlocked.`, { duration: 8000 });
+        playNotificationChime();
+      } else if (data.status === 'REJECTED') {
+        toast(`Application update: Your application for "${data.jobTitle}" has been reviewed.`, { duration: 5000 });
+      }
+      void fetchMatches();
+      void fetchProfile();
+    };
+
     socket.on('resume:parsed',       onParsed);
     socket.on('resume:parse-failed', onFailed);
+    socket.on('application:status_changed', onStatusChanged);
 
     return () => {
       socket.off('resume:parsed',       onParsed);
       socket.off('resume:parse-failed', onFailed);
+      socket.off('application:status_changed', onStatusChanged);
     };
   }, [fetchMatches, fetchProfile]);
 
@@ -522,6 +552,15 @@ export default function StudentDashboard() {
                   <p className="text-slate-500 mt-0.5 text-sm">Welcome back, <span className="font-semibold text-slate-700">{displayName}</span></p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openChat(null)}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-sm transition-all"
+                  >
+                    <MessageSquare size={14} className="text-indigo-600" />
+                    <span>Live Chat</span>
+                  </button>
+                  <NotificationBell onOpenChat={(convId) => openChat(convId ?? null)} />
                   {profile && (
                     <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
                       <CheckCircle size={14} className="text-emerald-600" />
@@ -636,7 +675,16 @@ export default function StudentDashboard() {
                   )}
                 </div>
               </div>
-              <JobMatchList matches={matches.slice(0, 3)} profile={profile} loadingMatches={loadingMatches} appliedJobs={appliedJobs} applying={applying} onApply={handleApply} onViewDetails={setSelectedJob} />
+              <JobMatchList
+                matches={matches.slice(0, 3)}
+                profile={profile}
+                loadingMatches={loadingMatches}
+                appliedJobs={appliedJobs}
+                applying={applying}
+                onApply={handleApply}
+                onViewDetails={setSelectedJob}
+                onOpenChat={(convId) => openChat(convId ?? null)}
+              />
             </div>
           </div>
         )}
@@ -668,7 +716,17 @@ export default function StudentDashboard() {
               ))}
             </div>
 
-            <JobMatchList matches={filteredMatches} profile={profile} loadingMatches={loadingMatches} appliedJobs={appliedJobs} applying={applying} onApply={handleApply} onViewDetails={setSelectedJob} showAll />
+            <JobMatchList
+              matches={filteredMatches}
+              profile={profile}
+              loadingMatches={loadingMatches}
+              appliedJobs={appliedJobs}
+              applying={applying}
+              onApply={handleApply}
+              onViewDetails={setSelectedJob}
+              onOpenChat={(convId) => openChat(convId ?? null)}
+              showAll
+            />
           </div>
         )}
 
@@ -1069,6 +1127,10 @@ export default function StudentDashboard() {
           match={selectedJob} profile={profile} applying={applying}
           appliedJobs={appliedJobs} onApply={handleApply}
           onClose={() => setSelectedJob(null)}
+          onOpenChat={(convId) => {
+            setSelectedJob(null);
+            openChat(convId ?? null);
+          }}
         />
       )}
     </div>
@@ -1078,11 +1140,26 @@ export default function StudentDashboard() {
 // =============================================================================
 // Shared: JobMatchList
 // =============================================================================
-function JobMatchList({ matches, profile, loadingMatches, appliedJobs, applying, onApply, onViewDetails, showAll = false }: {
-  matches: MatchedJob[]; profile: StudentProfile | null; loadingMatches: boolean;
-  appliedJobs: Set<string>; applying: string | null;
+function JobMatchList({
+  matches,
+  profile,
+  loadingMatches,
+  appliedJobs,
+  applying,
+  onApply,
+  onViewDetails,
+  onOpenChat,
+  showAll = false,
+}: {
+  matches: MatchedJob[];
+  profile: StudentProfile | null;
+  loadingMatches: boolean;
+  appliedJobs: Set<string>;
+  applying: string | null;
   onApply: (id: string, title: string) => Promise<void>;
-  onViewDetails: (m: MatchedJob) => void; showAll?: boolean;
+  onViewDetails: (m: MatchedJob) => void;
+  onOpenChat?: (conversationId?: string) => void;
+  showAll?: boolean;
 }) {
   if (loadingMatches) return (
     <div className="space-y-4">
@@ -1106,7 +1183,8 @@ function JobMatchList({ matches, profile, loadingMatches, appliedJobs, applying,
 
   return (
     <div className="space-y-4">
-      {(showAll ? matches : matches).map(({ matchScore, job }, idx) => {
+      {(showAll ? matches : matches).map((jobMatch, idx) => {
+        const { matchScore, job, applicationStatus, conversationId } = jobMatch;
         const { matched, missing } = analyzeSkillGap(job.requiredSkills, profile?.parsedSkills ?? []);
         const isApplied = appliedJobs.has(job.id);
         const canApply  = matchScore >= 50 && !isApplied;
@@ -1148,24 +1226,39 @@ function JobMatchList({ matches, profile, loadingMatches, appliedJobs, applying,
                   <span className="text-xs bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">
                     Exp: <span className="font-bold text-slate-800">{job.minExperience} yrs</span>
                   </span>
-                  <button onClick={() => onViewDetails({ matchScore, hasApplied: isApplied, job })}
+                  <button onClick={() => onViewDetails(jobMatch)}
                     className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline underline-offset-2 transition-colors">
                     <BookOpen size={11} />View Full Details
                   </button>
                 </div>
               </div>
 
-              {/* Apply */}
-              <button onClick={() => void onApply(job.id, job.title)}
-                disabled={applying === job.id || !canApply}
-                className={cn('flex-shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 w-full sm:w-auto',
-                  isApplied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-                  : canApply ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-[0.97]'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200',
-                  applying === job.id && 'opacity-70')}>
-                {applying === job.id ? <Loader2 size={14} className="animate-spin" /> : isApplied ? <CheckCircle size={14} /> : <ChevronRight size={14} />}
-                {isApplied ? 'Applied' : matchScore >= 50 ? 'Apply Now' : 'Below Threshold'}
-              </button>
+              {/* Actions: Apply / Chat */}
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                {isApplied && applicationStatus === 'SHORTLISTED' && onOpenChat && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenChat(conversationId ?? undefined)}
+                    className="flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-600/30 transition-all duration-150 animate-pulse"
+                    title="Live 1-on-1 Chat with Recruiter"
+                  >
+                    <MessageSquare size={13} />
+                    Chat with Recruiter
+                  </button>
+                )}
+                <button onClick={() => void onApply(job.id, job.title)}
+                  disabled={applying === job.id || !canApply}
+                  className={cn('flex-shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 w-full sm:w-auto',
+                    isApplied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                    : canApply ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-[0.97]'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200',
+                    applying === job.id && 'opacity-70')}>
+                  {applying === job.id ? <Loader2 size={14} className="animate-spin" /> : isApplied ? <CheckCircle size={14} /> : <ChevronRight size={14} />}
+                  {isApplied
+                    ? (applicationStatus === 'SHORTLISTED' ? 'Shortlisted 🎉' : applicationStatus === 'REJECTED' ? 'Reviewed' : 'Applied')
+                    : matchScore >= 50 ? 'Apply Now' : 'Below Threshold'}
+                </button>
+              </div>
             </div>
 
             {/* Skill gap */}
@@ -1219,11 +1312,24 @@ function JobMatchList({ matches, profile, loadingMatches, appliedJobs, applying,
 // =============================================================================
 // JobDetailsModal (preserved exactly)
 // =============================================================================
-function JobDetailsModal({ match, profile, applying, appliedJobs, onApply, onClose }: {
-  match: MatchedJob; profile: StudentProfile | null; applying: string | null;
-  appliedJobs: Set<string>; onApply: (id: string, title: string) => Promise<void>; onClose: () => void;
+function JobDetailsModal({
+  match,
+  profile,
+  applying,
+  appliedJobs,
+  onApply,
+  onClose,
+  onOpenChat,
+}: {
+  match: MatchedJob;
+  profile: StudentProfile | null;
+  applying: string | null;
+  appliedJobs: Set<string>;
+  onApply: (id: string, title: string) => Promise<void>;
+  onClose: () => void;
+  onOpenChat?: (conversationId?: string) => void;
 }) {
-  const { matchScore, job } = match;
+  const { matchScore, job, applicationStatus, conversationId } = match;
   const isApplied   = appliedJobs.has(job.id);
   const canApply    = matchScore >= 50 && !isApplied;
   const company     = job.recruiter?.recruiterProfile?.companyName;
@@ -1279,6 +1385,16 @@ function JobDetailsModal({ match, profile, applying, appliedJobs, onApply, onClo
           )}
         </div>
         <div className="flex-shrink-0 border-t border-slate-200 p-5 bg-white flex items-center gap-3">
+          {isApplied && applicationStatus === 'SHORTLISTED' && onOpenChat && (
+            <button
+              type="button"
+              onClick={() => onOpenChat(conversationId ?? undefined)}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-600/30 transition-all duration-150 animate-pulse"
+            >
+              <MessageSquare size={15} />
+              Chat with Recruiter
+            </button>
+          )}
           <button onClick={() => void onApply(job.id, job.title)} disabled={applying === job.id || !canApply}
             className={cn('flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-150',
               isApplied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'

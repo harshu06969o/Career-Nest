@@ -20,6 +20,14 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum NotificationType {
+  APPLICATION_SHORTLISTED
+  APPLICATION_REJECTED
+  NEW_APPLICATION_RECEIVED
+  NEW_CHAT_MESSAGE
+  CAMPUS_ANNOUNCEMENT
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -29,9 +37,13 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  studentProfile   StudentProfile?
-  recruiterProfile RecruiterProfile?
-  postedJobs       Job[]
+  studentProfile         StudentProfile?
+  recruiterProfile       RecruiterProfile?
+  postedJobs             Job[]
+  recruiterConversations Conversation[] @relation("RecruiterConversations")
+  studentConversations   Conversation[] @relation("StudentConversations")
+  sentMessages           ChatMessage[]
+  notifications          Notification[]
 
   @@map("users")
 }
@@ -91,10 +103,61 @@ model Application {
   status     ApplicationStatus @default(PENDING)
   appliedAt  DateTime          @default(now())
 
-  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  job     Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  student      StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  job          Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  conversation Conversation?
 
   @@unique([studentId, jobId])
   @@index([jobId])
   @@map("applications")
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  recruiterId   String
+  studentId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  recruiter   User          @relation("RecruiterConversations", fields: [recruiterId], references: [id], onDelete: Cascade)
+  student     User          @relation("StudentConversations", fields: [studentId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+
+  @@index([recruiterId])
+  @@index([studentId])
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  isRead         Boolean   @default(false)
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  linkUrl   String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }

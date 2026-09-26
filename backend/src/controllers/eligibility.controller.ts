@@ -8,6 +8,7 @@ import {
   type JobMatchInput,
 } from '../services/matcher.service.js';
 import { sendApplicationConfirmation } from '../services/notification.service.js';
+import { emitToUser } from '../config/socketServer.js';
 
 // =============================================================================
 // Internal Types
@@ -30,7 +31,9 @@ interface JobRecord {
 
 interface RankedJob {
   matchScore: number;
-  hasApplied: boolean; // BUG 2 FIX: injected so frontend knows applied state on page load
+  hasApplied: boolean;
+  applicationStatus?: string | null;
+  conversationId?: string | null;
   job: JobRecord;
 }
 
@@ -119,6 +122,9 @@ export const checkAndApply = async (req: Request, res: Response): Promise<void> 
       where: { userId },
       select: {
         id: true,
+        firstName: true,
+        lastName: true,
+        college: true,
         parsedSkills: true,
         cgpa: true,
         experienceYears: true,
@@ -264,6 +270,33 @@ export const checkAndApply = async (req: Request, res: Response): Promise<void> 
       matchScore,
     );
 
+    // ── Step 8: Real-Time In-App Notification & Socket Alert for Recruiter ───
+    void (async () => {
+      try {
+        const studentName = `${studentProfile.firstName} ${studentProfile.lastName}`.trim() || studentProfile.user.email;
+        const notif = await prisma.notification.create({
+          data: {
+            userId: job.recruiterId,
+            type: 'NEW_APPLICATION_RECEIVED',
+            title: '📥 New Candidate Applied',
+            message: `${studentName} applied to "${job.title}" with a ${matchScore}% match score.`,
+            linkUrl: `/recruiter/dashboard?jobId=${job.id}`,
+          },
+        });
+        emitToUser(job.recruiterId, 'recruiter:new_applicant', {
+          jobId: job.id,
+          jobTitle: job.title,
+          studentId: studentProfile.id,
+          studentName,
+          matchScore,
+          appliedAt: application.appliedAt,
+        });
+        emitToUser(job.recruiterId, 'notification:new', notif);
+      } catch (notifErr) {
+        console.error('[checkAndApply] Recruiter real-time notification failed (non-fatal):', notifErr);
+      }
+    })();
+
     res.status(201).json({
       success: true,
       message: `Application submitted successfully! Your match score is ${matchScore}%.`,
@@ -329,18 +362,25 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
     // query. Using a Set for O(1) lookups when tagging each ranked job below.
     // This is the key fix for Bug 2: without this, the frontend initializes
     // appliedJobs as an empty Set on every page load, losing applied state.
-    let appliedJobIdSet: Set<string>;
+    const applicationByJobId = new Map<string, { status: string; conversationId: string | null }>();
     try {
       const existingApplications = await prisma.application.findMany({
         where: { studentId: studentProfile.id },
-        select: { jobId: true }, // Minimal projection — we only need the jobId
+        select: {
+          jobId: true,
+          status: true,
+          conversation: { select: { id: true } },
+        },
       });
-      appliedJobIdSet = new Set(existingApplications.map((a) => a.jobId));
-      console.log(`[Matcher] Student ${userId} has ${appliedJobIdSet.size} existing application(s)`);
+      existingApplications.forEach((a) => {
+        applicationByJobId.set(a.jobId, {
+          status: a.status,
+          conversationId: a.conversation?.id ?? null,
+        });
+      });
+      console.log(`[Matcher] Student ${userId} has ${existingApplications.length} existing application(s)`);
     } catch (appError) {
-      // Non-fatal: if this query fails, we still return matches — just without hasApplied
       console.error('[getStudentMatches] Failed to fetch existing applications:', appError);
-      appliedJobIdSet = new Set();
     }
 
     // ── Step 3: Load active jobs (cache-first) ────────────────────────────────
@@ -363,7 +403,6 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
     }
 
     // ── Step 4: Score every job and tag with hasApplied ──────────────────────
-    // calculateMatchScore is a pure function — safe to call in a tight loop.
     const studentInput: StudentMatchInput = {
       parsedSkills:    studentProfile.parsedSkills,
       cgpa:            studentProfile.cgpa,
@@ -377,12 +416,12 @@ export const getStudentMatches = async (req: Request, res: Response): Promise<vo
           minCgpa:        job.minCgpa,
           minExperience:  job.minExperience,
         };
+        const appInfo = applicationByJobId.get(job.id);
         return {
           matchScore: calculateMatchScore(studentInput, jobInput),
-          // BUG 2 FIX: inject hasApplied so the frontend can correctly
-          // render the 'Applied' button state on initial page load without
-          // needing a separate round-trip or page-level refetch.
-          hasApplied: appliedJobIdSet.has(job.id),
+          hasApplied: !!appInfo,
+          applicationStatus: appInfo?.status ?? null,
+          conversationId: appInfo?.conversationId ?? null,
           job,
         };
       })

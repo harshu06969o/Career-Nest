@@ -1,15 +1,19 @@
 import { useEffect, useState, useCallback, useMemo, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   PlusCircle, Briefcase, Users, Loader2,
   Sparkles, ChevronDown, ChevronUp, RefreshCw,
   Search, Mail, Trash2, FileText, ExternalLink, Download, X, BookOpen,
   LayoutDashboard, BarChart2, Clock, TrendingUp, CheckCircle,
-  AlertCircle, Target, Zap, Award,
+  AlertCircle, Target, Zap, Award, MessageSquare, CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
+import { getSocket } from '../../lib/socket';
 import { cn } from '../../lib/cn';
 import CircularProgress from '../../components/CircularProgress';
+import NotificationBell from '../../components/NotificationBell';
+import { useChatStore } from '../../store/chatStore';
 
 // =============================================================================
 // Types
@@ -31,6 +35,7 @@ interface RealApplicant {
   matchScore: number | null;
   status: string;
   appliedAt: string;
+  conversationId?: string | null;
   student: {
     id: string;
     firstName: string;
@@ -72,6 +77,19 @@ export default function RecruiterDashboard() {
   const [viewingId,     setViewingId]     = useState<string | null>(null);
   const [jdPreviewJob,  setJdPreviewJob]  = useState<Job | null>(null);
 
+  // Real-time Chat & Hiring states
+  const openChat = useChatStore((s) => s.openChat);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'SHORTLISTED' | 'REJECTED'>('ALL');
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const qConvId = searchParams.get('conversationId');
+    if (qConvId) {
+      openChat(qConvId);
+    }
+  }, [searchParams, openChat]);
+
   // Post form state
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
@@ -92,6 +110,29 @@ export default function RecruiterDashboard() {
   }, []);
 
   useEffect(() => { void fetchJobs(); }, [fetchJobs]);
+
+  // Real-time Socket listener for incoming candidate applications
+  useEffect(() => {
+    const socket = getSocket();
+    const handleNewApplicant = (data: { jobId: string; jobTitle: string; studentName: string; matchScore: number }) => {
+      toast(`📥 ${data.studentName} applied to "${data.jobTitle}" (${data.matchScore}% Match)!`, {
+        icon: '🎯',
+        duration: 6000,
+      });
+      void fetchJobs();
+      setApplicantsByJob(prev => {
+        if (!prev[data.jobId]) return prev;
+        const next = { ...prev };
+        delete next[data.jobId];
+        return next;
+      });
+      setAllLoaded(false);
+    };
+    socket.on('recruiter:new_applicant', handleNewApplicant);
+    return () => {
+      socket.off('recruiter:new_applicant', handleNewApplicant);
+    };
+  }, [fetchJobs]);
 
   const fetchApplicantsForJob = useCallback(async (jobId: string) => {
     if (applicantsByJob[jobId]) return; // already loaded
@@ -123,6 +164,48 @@ export default function RecruiterDashboard() {
       setLoadingAll(false);
     }
   }, [jobs, allLoaded]);
+
+  // ── Application Status Transition Handler ──────────────────────────────────
+  const handleStatusChange = async (applicantId: string, status: 'SHORTLISTED' | 'REJECTED') => {
+    setStatusUpdatingId(applicantId);
+    try {
+      const res = await api.patch<{ success: boolean; data: { conversationId?: string } }>(
+        `/jobs/applications/${applicantId}/status`,
+        { status },
+      );
+      if (res.data.success) {
+        toast.success(
+          status === 'SHORTLISTED'
+            ? '🎉 Candidate Shortlisted! Direct 1-on-1 chat unlocked.'
+            : 'Application marked as Rejected.',
+        );
+        // Update local state in applicantsByJob
+        setApplicantsByJob(prev => {
+          const next = { ...prev };
+          for (const k of Object.keys(next)) {
+            next[k] = next[k].map(a =>
+              a.id === applicantId ? { ...a, status, conversationId: res.data.data.conversationId } : a,
+            );
+          }
+          return next;
+        });
+        // Update in allApplicants
+        setAllApplicants(prev =>
+          prev.map(a =>
+            a.id === applicantId ? { ...a, status, conversationId: res.data.data.conversationId } : a,
+          ),
+        );
+
+        if (status === 'SHORTLISTED' && res.data.data.conversationId) {
+          openChat(res.data.data.conversationId);
+        }
+      }
+    } catch {
+      toast.error('Failed to update application status.');
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
 
   // Load all applicants when navigating to that view
   useEffect(() => {
@@ -206,17 +289,21 @@ export default function RecruiterDashboard() {
     return { topSkills, avgScore, statusBreakdown };
   }, [jobs, allApplicants]);
 
-  // Filtered applicants for search
+  // Filtered applicants for search & status filter
   const filteredApplicants = useMemo(() => {
-    if (!applicantsSearch.trim()) return allApplicants;
+    let list = allApplicants;
+    if (statusFilter !== 'ALL') {
+      list = list.filter(a => a.status === statusFilter);
+    }
+    if (!applicantsSearch.trim()) return list;
     const q = applicantsSearch.toLowerCase();
-    return allApplicants.filter(a =>
+    return list.filter(a =>
       `${a.student.firstName} ${a.student.lastName}`.toLowerCase().includes(q) ||
       a.student.college.toLowerCase().includes(q) ||
       a.student.user.email.toLowerCase().includes(q) ||
       a.student.parsedSkills.some(s => s.toLowerCase().includes(q))
     );
-  }, [allApplicants, applicantsSearch]);
+  }, [allApplicants, applicantsSearch, statusFilter]);
 
   // ── Sidebar nav ────────────────────────────────────────────────────────────
   const navItems: { view: RecruiterView; icon: React.ReactNode; label: string; badge?: number }[] = [
@@ -309,6 +396,15 @@ export default function RecruiterDashboard() {
                   <p className="text-slate-500 mt-0.5 text-sm">Manage job postings and review AI-scored applicants</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openChat(null)}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-sm transition-all"
+                  >
+                    <MessageSquare size={14} className="text-indigo-600" />
+                    <span>Live Chat</span>
+                  </button>
+                  <NotificationBell onOpenChat={(convId) => openChat(convId ?? null)} />
                   <button onClick={() => setActiveView('post-job')}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl
                                hover:bg-indigo-700 shadow-sm transition-all active:scale-[0.97]">
@@ -483,7 +579,19 @@ export default function RecruiterDashboard() {
                             <div className="text-center py-8"><Users size={22} className="text-slate-300 mx-auto mb-2" /><p className="text-sm text-slate-400">No applications yet</p></div>
                           ) : (
                             <div className="space-y-3">
-                              {jobApplicants.map(a => <ApplicantRow key={a.id} applicant={a} onDownload={handleDownloadResume} onView={handleViewResume} downloadingId={downloadingId} viewingId={viewingId} />)}
+                              {jobApplicants.map(a => (
+                                <ApplicantRow
+                                  key={a.id}
+                                  applicant={a}
+                                  onDownload={handleDownloadResume}
+                                  onView={handleViewResume}
+                                  downloadingId={downloadingId}
+                                  viewingId={viewingId}
+                                  onStatusChange={handleStatusChange}
+                                  onOpenChat={(convId) => openChat(convId ?? null)}
+                                  statusLoadingId={statusUpdatingId}
+                                />
+                              ))}
                             </div>
                           )}
                         </div>
@@ -528,13 +636,38 @@ export default function RecruiterDashboard() {
               </div>
             )}
 
-            {/* Search bar */}
+            {/* Search & Status Filter bar */}
             {allLoaded && (
-              <div className="relative animate-view-enter stagger-2">
-                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" placeholder="Search by name, college, skill, or email…" value={applicantsSearch} onChange={e => setApplicantsSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400
-                             focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 transition-all" />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 animate-view-enter stagger-2">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" placeholder="Search by name, college, skill, or email…" value={applicantsSearch} onChange={e => setApplicantsSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400
+                               focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 transition-all" />
+                </div>
+                {/* Status Filter Pills */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 overflow-x-auto no-scrollbar">
+                  {[
+                    { key: 'ALL', label: `All (${allApplicants.length})` },
+                    { key: 'PENDING', label: `Pending (${analytics.statusBreakdown['PENDING'] ?? 0})` },
+                    { key: 'SHORTLISTED', label: `Shortlisted (${analytics.statusBreakdown['SHORTLISTED'] ?? 0})` },
+                    { key: 'REJECTED', label: `Rejected (${analytics.statusBreakdown['REJECTED'] ?? 0})` },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setStatusFilter(key as typeof statusFilter)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 whitespace-nowrap',
+                        statusFilter === key
+                          ? 'bg-white text-indigo-700 shadow-sm border border-indigo-100'
+                          : 'text-slate-500 hover:text-slate-800',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -565,7 +698,16 @@ export default function RecruiterDashboard() {
                 <div className="space-y-3">
                   {filteredApplicants.map((a, i) => (
                     <div key={`${a.id}-${i}`} className={cn('animate-view-enter', `stagger-${Math.min(i + 1, 6)}`)}>
-                      <ApplicantRow applicant={a} onDownload={handleDownloadResume} onView={handleViewResume} downloadingId={downloadingId} viewingId={viewingId} />
+                      <ApplicantRow
+                        applicant={a}
+                        onDownload={handleDownloadResume}
+                        onView={handleViewResume}
+                        downloadingId={downloadingId}
+                        viewingId={viewingId}
+                        onStatusChange={handleStatusChange}
+                        onOpenChat={(convId) => openChat(convId ?? null)}
+                        statusLoadingId={statusUpdatingId}
+                      />
                     </div>
                   ))}
                 </div>
@@ -781,33 +923,89 @@ export default function RecruiterDashboard() {
 // =============================================================================
 // Shared: ApplicantRow
 // =============================================================================
-function ApplicantRow({ applicant, onDownload, onView, downloadingId, viewingId }: {
+function ApplicantRow({
+  applicant,
+  onDownload,
+  onView,
+  downloadingId,
+  viewingId,
+  onStatusChange,
+  onOpenChat,
+  statusLoadingId,
+}: {
   applicant: RealApplicant;
   onDownload: (url: string, name: string, id: string) => Promise<void>;
   onView: (url: string, id: string) => Promise<void>;
   downloadingId: string | null;
   viewingId: string | null;
+  onStatusChange?: (applicantId: string, status: 'SHORTLISTED' | 'REJECTED') => Promise<void>;
+  onOpenChat?: (conversationId?: string) => void;
+  statusLoadingId?: string | null;
 }) {
   const name  = `${applicant.student.firstName} ${applicant.student.lastName}`.trim() || applicant.student.user.email;
   const score = applicant.matchScore ?? 0;
+  const isUpdatingStatus = statusLoadingId === applicant.id;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between
+    <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4
                     hover:border-indigo-200 hover:shadow-card transition-all duration-200">
       <div className="flex items-center gap-4">
         <div className="flex-shrink-0"><CircularProgress score={score} size={52} stroke={5} /></div>
         <div>
-          <p className="font-bold text-slate-900 text-sm" style={{ fontFamily: 'Plus Jakarta Sans, Inter, sans-serif' }}>{name}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-slate-900 text-sm" style={{ fontFamily: 'Plus Jakarta Sans, Inter, sans-serif' }}>{name}</p>
+            <span className={cn('inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
+              applicant.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border border-amber-200'
+              : applicant.status === 'SHORTLISTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-red-50 text-red-700 border border-red-200')}>
+              {applicant.status}
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">{applicant.student.college} · <span className="font-semibold">{applicant.student.cgpa}</span> CGPA</p>
-          <span className={cn('inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide',
-            applicant.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border border-amber-200'
-            : applicant.status === 'SHORTLISTED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-red-50 text-red-700 border border-red-200')}>
-            {applicant.status}
-          </span>
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+
+      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+        {/* Shortlist & Reject Actions */}
+        {onStatusChange && (
+          <div className="flex items-center gap-1.5 mr-1 border-r border-slate-200 pr-2">
+            {applicant.status !== 'SHORTLISTED' && (
+              <button
+                disabled={isUpdatingStatus}
+                onClick={() => void onStatusChange(applicant.id, 'SHORTLISTED')}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-1 disabled:opacity-50"
+                title="Shortlist applicant & unlock live chat"
+              >
+                {isUpdatingStatus ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                Shortlist
+              </button>
+            )}
+
+            {applicant.status === 'SHORTLISTED' && onOpenChat && (
+              <button
+                onClick={() => onOpenChat(applicant.conversationId ?? undefined)}
+                className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold rounded-lg shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 animate-pulse"
+                title="Direct 1-on-1 Live Chat"
+              >
+                <MessageSquare size={13} />
+                Live Chat
+              </button>
+            )}
+
+            {applicant.status !== 'REJECTED' && (
+              <button
+                disabled={isUpdatingStatus}
+                onClick={() => void onStatusChange(applicant.id, 'REJECTED')}
+                className="px-2 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-semibold rounded-lg border border-slate-200 hover:border-rose-200 transition-colors disabled:opacity-50"
+                title="Reject candidate"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* View & PDF & Email actions */}
         {applicant.student.resumeUrl ? (
           <>
             <button disabled={viewingId === applicant.id}

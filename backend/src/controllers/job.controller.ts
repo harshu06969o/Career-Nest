@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import prisma from '../config/prismaClient.js';
 import redisClient from '../config/redisClient.js';
 import { parseJobDescription } from '../services/llm.service.js';
+import { emitToUser } from '../config/socketServer.js';
 
 // BUG FIX (Bug 3): Added to support getJobApplicants response typing
 interface ApplicantWithProfile {
@@ -9,6 +10,8 @@ interface ApplicantWithProfile {
   matchScore: number | null;
   status: string;
   appliedAt: Date;
+  conversation?: { id: string } | null;
+  conversationId?: string | null;
   student: {
     id: string;
     firstName: string;
@@ -341,11 +344,12 @@ export const getJobApplicants = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Step 2: Fetch all real applications with joined student profile data
+    // Step 2: Fetch all real applications with joined student profile data & conversation
     const applications = await prisma.application.findMany({
       where: { jobId }, // jobId is a guaranteed string
       orderBy: { matchScore: 'desc' }, // Best match first — mirrors recruiter UX
       include: {
+        conversation: { select: { id: true } },
         student: {
           select: {
             id:              true,
@@ -360,13 +364,18 @@ export const getJobApplicants = async (req: Request, res: Response): Promise<voi
           },
         },
       },
-    }) as unknown as ApplicantWithProfile[]; // unknown intermediate resolves strict overlap TS error
+    });
+
+    const mapped = applications.map(app => ({
+      ...app,
+      conversationId: app.conversation?.id ?? null,
+    })) as unknown as ApplicantWithProfile[];
 
     res.status(200).json({
       success: true,
       jobTitle: job.title,
-      totalApplicants: applications.length,
-      data: applications,
+      totalApplicants: mapped.length,
+      data: mapped,
     });
   } catch (dbError) {
     console.error('[DB] getJobApplicants failed:', dbError);
@@ -460,5 +469,136 @@ export const getAdminStats = async (req: Request, res: Response): Promise<void> 
   } catch (dbError) {
     console.error('[DB] getAdminStats failed:', dbError);
     res.status(500).json({ success: false, message: 'Failed to fetch admin statistics.' });
+  }
+};
+
+/**
+ * Updates application status (PENDING, SHORTLISTED, REJECTED).
+ * When SHORTLISTED, automatically initializes a Conversation and notifies the student via in-app notification & WebSocket.
+ */
+export const updateApplicationStatus = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, message: 'Unauthorized.' });
+    return;
+  }
+
+  const { userId, role } = req.user;
+  const applicationId = resolveParam(req.params['id'] || req.params['applicationId']);
+  const { status } = req.body as { status?: string };
+
+  if (!applicationId || !status || !['PENDING', 'SHORTLISTED', 'REJECTED'].includes(status)) {
+    res.status(400).json({
+      success: false,
+      message: 'Valid applicationId and status (PENDING, SHORTLISTED, REJECTED) are required.',
+    });
+    return;
+  }
+
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        job: { select: { id: true, title: true, recruiterId: true } },
+        student: {
+          select: {
+            id: true,
+            userId: true,
+            firstName: true,
+            lastName: true,
+            user: { select: { email: true } },
+          },
+        },
+        conversation: { select: { id: true } },
+      },
+    });
+
+    if (!application) {
+      res.status(404).json({ success: false, message: 'Application not found.' });
+      return;
+    }
+
+    // Security check: Only the recruiter who posted the job or an ADMIN can update status
+    if (role !== 'ADMIN' && application.job.recruiterId !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden. You do not have permission to manage this application.',
+      });
+      return;
+    }
+
+    // Update status in PostgreSQL
+    const updatedApplication = await prisma.application.update({
+      where: { id: applicationId },
+      data: { status: status as 'PENDING' | 'SHORTLISTED' | 'REJECTED' },
+    });
+
+    let conversationId: string | null = application.conversation?.id ?? null;
+
+    if (status === 'SHORTLISTED') {
+      // 1. Upsert Conversation
+      const conversation = await prisma.conversation.upsert({
+        where: { applicationId: application.id },
+        create: {
+          applicationId: application.id,
+          recruiterId: application.job.recruiterId,
+          studentId: application.student.userId,
+        },
+        update: {},
+      });
+      conversationId = conversation.id;
+
+      // 2. Create in-app Notification for student
+      const notif = await prisma.notification.create({
+        data: {
+          userId: application.student.userId,
+          type: 'APPLICATION_SHORTLISTED',
+          title: '🎉 You have been Shortlisted!',
+          message: `Congratulations! Your application for "${application.job.title}" has been shortlisted. Real-time chat with the recruiter is now open!`,
+          linkUrl: `/student/dashboard?conversationId=${conversation.id}`,
+        },
+      });
+
+      // 3. Emit real-time events to student
+      emitToUser(application.student.userId, 'application:status_changed', {
+        applicationId: application.id,
+        jobId: application.job.id,
+        jobTitle: application.job.title,
+        status: 'SHORTLISTED',
+        conversationId: conversation.id,
+      });
+      emitToUser(application.student.userId, 'notification:new', notif);
+    } else if (status === 'REJECTED') {
+      // 1. Create in-app Notification for student
+      const notif = await prisma.notification.create({
+        data: {
+          userId: application.student.userId,
+          type: 'APPLICATION_REJECTED',
+          title: 'Application Status Update',
+          message: `Your application for "${application.job.title}" has been reviewed. The recruiter has chosen to proceed with other candidates.`,
+          linkUrl: `/student/dashboard`,
+        },
+      });
+
+      // 2. Emit real-time events to student
+      emitToUser(application.student.userId, 'application:status_changed', {
+        applicationId: application.id,
+        jobId: application.job.id,
+        jobTitle: application.job.title,
+        status: 'REJECTED',
+      });
+      emitToUser(application.student.userId, 'notification:new', notif);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Application status updated to ${status}.`,
+      data: {
+        application: updatedApplication,
+        conversationId,
+      },
+    });
+  } catch (error) {
+    console.error('[updateApplicationStatus] Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update application status.' });
   }
 };

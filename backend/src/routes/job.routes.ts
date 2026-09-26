@@ -7,6 +7,7 @@ import {
   getJobApplicants,
   deleteJob,
   getAdminStats,   // Real-time platform stats for Admin Dashboard
+  updateApplicationStatus,
 } from '../controllers/job.controller.js';
 
 const router = Router();
@@ -92,6 +93,20 @@ router.get(
   verifyToken,
   requireRole(['RECRUITER', 'ADMIN']),
   getJobApplicants,
+);
+
+// =============================================================================
+// PATCH /api/jobs/applications/:id/status
+// =============================================================================
+// Updates an applicant's status (PENDING, SHORTLISTED, REJECTED).
+// Automatically creates a Conversation and notifies candidate on SHORTLISTED.
+// Security chain: verifyToken → requireRole(['RECRUITER','ADMIN']) → updateApplicationStatus
+// =============================================================================
+router.patch(
+  '/applications/:id/status',
+  verifyToken,
+  requireRole(['RECRUITER', 'ADMIN']),
+  updateApplicationStatus,
 );
 
 // =============================================================================

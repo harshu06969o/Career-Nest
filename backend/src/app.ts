@@ -11,6 +11,8 @@ import authRoutes from './routes/auth.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import jobRoutes from './routes/job.routes.js';
 import eligibilityRoutes from './routes/eligibility.routes.js';
+import chatRoutes from './routes/chat.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 import passport from './config/passport.js';
 
 // ESM-safe __dirname
@@ -94,5 +96,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/eligibility', eligibilityRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 export default app;
