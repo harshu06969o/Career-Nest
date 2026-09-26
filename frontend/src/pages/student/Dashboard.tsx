@@ -8,7 +8,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../lib/axios';
+import { getSocket } from '../../lib/socket';
 import CircularProgress from '../../components/CircularProgress';
+import ResumeAnalyzing from '../../components/ResumeAnalyzing';
 import { cn } from '../../lib/cn';
 
 // =============================================================================
@@ -182,6 +184,7 @@ export default function StudentDashboard() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [uploading,      setUploading]      = useState(false);
+  const [isAnalyzing,    setIsAnalyzing]    = useState(false); // shows ResumeAnalyzing overlay
   const [applying,       setApplying]       = useState<string | null>(null);
   const [appliedJobs,    setAppliedJobs]    = useState<Set<string>>(new Set());
   const [dragOver,       setDragOver]       = useState(false);
@@ -189,6 +192,7 @@ export default function StudentDashboard() {
   const [activeView,     setActiveView]     = useState<ActiveView>('dashboard');
   const [matchFilter,    setMatchFilter]    = useState<'all' | 'eligible' | 'applied'>('all');
   const fileRef = useRef<HTMLInputElement>(null);
+
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchProfile = useCallback(async () => {
@@ -208,6 +212,87 @@ export default function StudentDashboard() {
     } catch { /* silently fail */ } finally { setLoadingMatches(false); }
   }, []);
 
+  // ── WebSocket: resume:parsed / resume:parse-failed ─────────────────────────
+  useEffect(() => {
+    const socket = getSocket();
+
+    const onParsed = (data: {
+      parsedSkills:    string[];
+      experienceYears: number;
+      cgpa:            number;
+      college:         string;
+      resumeUrl:       string;
+      skillCount:      number;
+    }) => {
+      console.log('[Dashboard] Received resume:parsed via WebSocket:', data);
+      setProfile(prev => prev ? {
+        ...prev,
+        parsedSkills:    data.parsedSkills,
+        experienceYears: data.experienceYears,
+        cgpa:            data.cgpa,
+        college:         data.college || prev.college,
+        resumeUrl:       data.resumeUrl,
+      } : prev);
+      setIsAnalyzing(false);
+      toast.success(`✨ AI extracted ${data.skillCount} skills from your resume!`, { duration: 5000 });
+      void fetchMatches();
+      void fetchProfile();
+    };
+
+    const onFailed = (data: { message: string }) => {
+      console.warn('[Dashboard] Received resume:parse-failed via WebSocket:', data);
+      setIsAnalyzing(false);
+      setUploading(false);
+      toast.error(data.message ?? 'AI parsing failed. Please try again.');
+    };
+
+    socket.on('resume:parsed',       onParsed);
+    socket.on('resume:parse-failed', onFailed);
+
+    return () => {
+      socket.off('resume:parsed',       onParsed);
+      socket.off('resume:parse-failed', onFailed);
+    };
+  }, [fetchMatches, fetchProfile]);
+
+  // ── Polling Fallback during isAnalyzing ─────────────────────────────────────
+  // If the WebSocket event is missed, dropped, or blocked by a proxy,
+  // this polling safety net ensures the user NEVER gets stuck at 92%.
+  useEffect(() => {
+    if (!isAnalyzing) return;
+
+    let pollCount = 0;
+    const maxPolls = 8; // 8 * 3s = 24 seconds max
+
+    const interval = setInterval(async () => {
+      pollCount++;
+      try {
+        const { data } = await api.get<{ data: StudentProfile }>('/student/profile');
+        if (data.data?.parsedSkills && data.data.parsedSkills.length > 0) {
+          console.log('[Dashboard Polling Fallback] Detected parsed skills in DB:', data.data.parsedSkills.length);
+          setProfile(data.data);
+          setIsAnalyzing(false);
+          toast.success(`✨ AI extracted ${data.data.parsedSkills.length} skills from your resume!`, { duration: 5000 });
+          void fetchMatches();
+          clearInterval(interval);
+          return;
+        }
+      } catch {
+        // Silently retry
+      }
+
+      if (pollCount >= maxPolls) {
+        console.log('[Dashboard Polling Fallback] Max attempts reached, auto-closing overlay');
+        setIsAnalyzing(false);
+        void fetchProfile();
+        void fetchMatches();
+        clearInterval(interval);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isAnalyzing, fetchMatches, fetchProfile]);
+
   useEffect(() => { void fetchProfile(); void fetchMatches(); }, [fetchProfile, fetchMatches]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -218,12 +303,16 @@ export default function StudentDashboard() {
     const form = new FormData();
     form.append('resume', file);
     try {
+      // Backend now returns 202 Accepted immediately — the real work is in the background worker
       await api.post('/student/resume', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast.success('Resume uploaded & parsed! ✨');
-      await fetchProfile(); await fetchMatches();
+      setUploading(false);
+      setIsAnalyzing(true); // show the premium analyzing overlay
+      toast('📤 Resume received! AI is now analysing your skills…', { icon: '🤖', duration: 4000 });
+      // Result will arrive via socket event 'resume:parsed' — no polling needed
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Upload failed.');
-    } finally { setUploading(false); }
+      setUploading(false);
+    }
   };
 
   const handleApply = async (jobId: string, jobTitle: string) => {
@@ -313,6 +402,22 @@ export default function StudentDashboard() {
 
   return (
     <div className="flex gap-6 items-start w-full">
+
+      {/* AI Analyzing overlay — shown while BullMQ worker processes the resume */}
+      {isAnalyzing && (
+        <ResumeAnalyzing
+          onComplete={() => {
+            setIsAnalyzing(false);
+            void fetchProfile();
+            void fetchMatches();
+          }}
+          onDismiss={() => {
+            setIsAnalyzing(false);
+            void fetchProfile();
+            void fetchMatches();
+          }}
+        />
+      )}
 
       {/* ══════════════════════════════════════════════════════════════════════
           LEFT SIDEBAR

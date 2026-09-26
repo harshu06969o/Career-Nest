@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import prisma from '../config/prismaClient.js';
-import { extractTextFromPdf, parseResumeWithLLM } from '../services/llm.service.js';
+import { resumeQueue } from '../config/bullmq.js';
 
 /**
  * Retrieves the profile of the currently authenticated student.
@@ -118,26 +118,24 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
- * Handles the PDF resume upload, extracts text, processes via LLM, and updates the database.
+ * Handles the PDF resume upload asynchronously.
  *
- * @param {Request} req - Express request object.
- * @param {Response} res - Express response object.
- * 
- * @architecture
- * Atomic Write Operation: The parsed data is written to MongoDB using a single `updateMany` 
- * operation (which acts atomically on the matching `userId`). This eliminates race conditions 
- * compared to a non-atomic `findUnique` followed by `update` workflow. If any stage of the 
- * pipeline fails (Cloudinary, PDF extraction, LLM parsing), the database write is safely aborted.
+ * @architecture — Async Pipeline (BullMQ + WebSocket)
+ * 1. Cloudinary upload is already done by the multer middleware before this runs.
+ * 2. This handler enqueues a BullMQ job with { resumeUrl, userId } and returns
+ *    HTTP 202 Accepted immediately — the client gets a response in < 200ms.
+ * 3. The background worker (resumeParser.worker.ts) does the heavy lifting:
+ *    PDF extraction → Gemini LLM parsing → DB upsert.
+ * 4. When the worker finishes, it emits 'resume:parsed' (or 'resume:parse-failed')
+ *    via Socket.io directly to the authenticated user's socket(s).
+ * 5. The frontend listens for these events and updates the UI without polling.
  */
 export const uploadResume = async (req: Request, res: Response): Promise<void> => {
-  // verifyToken guarantees req.user, but TypeScript doesn't know that —
-  // we narrow defensively to satisfy strict mode.
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
     return;
   }
 
-  // uploadResumeSingle guarantees req.file, but same defensive check applies.
   if (!req.file) {
     res.status(400).json({
       success: false,
@@ -147,86 +145,48 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   }
 
   const { userId } = req.user;
-
-  // After CloudinaryStorage, req.file.path contains the secure HTTPS URL
-  // (e.g. https://res.cloudinary.com/<cloud>/raw/upload/careernest_resumes/<id>.pdf)
-  // This URL is stable, CDN-backed, and safe to store directly in MongoDB.
+  // After CloudinaryStorage, req.file.path is the stable CDN-backed HTTPS URL
   const resumeUrl = req.file.path;
 
-  // Extract text from the securely hosted Cloudinary URL
-  let parsedData: Awaited<ReturnType<typeof parseResumeWithLLM>>;
-
-  try {
-    console.log(`[LLM Pipeline] Extracting text from Cloudinary URL: ${req.file.path}`);
-    const rawText = await extractTextFromPdf(req.file.path);
-
-    if (!rawText || rawText.trim().length < 20) {
-      res.status(422).json({
-        success: false,
-        message: 'Could not extract readable text from the uploaded PDF. Please ensure the file is not scanned/image-only.',
-      });
-      return;
-    }
-
-    console.log(`[LLM Pipeline] Extracted ${rawText.length} chars. Sending to Gemini...`);
-    parsedData = await parseResumeWithLLM(rawText);
-    console.log(`[LLM Pipeline] Parsed successfully. Exp: ${parsedData.experienceYears}yr`);
-    console.log(`[LLM Pipeline] Extracted Skills Array:`, parsedData.skills);
-  } catch (llmError) {
-    // We log the full error server-side but return a safe message to the client.
-    // The file is on disk but the DB is untouched — no corrupted state.
-    console.error('[LLM Pipeline] FAILED:', llmError);
-    res.status(500).json({
-      success: false,
-      message:
-        'Resume was uploaded but could not be parsed by the AI service. ' +
-        'Please try again or contact support.',
-    });
-    return;
-  }
-
-  // Execute a single atomic database write
+  // Persist the raw resumeUrl immediately so the student can see it in their
+  // profile while the AI is still analysing in the background.
   try {
     await prisma.studentProfile.upsert({
-      where: { userId },
-      update: {
-        resumeUrl,
-        parsedSkills: parsedData.skills,
-        experienceYears: parsedData.experienceYears,
-        cgpa: parsedData.cgpa,
-        ...(parsedData.college !== "" && { college: parsedData.college }),
-      },
+      where:  { userId },
+      update: { resumeUrl },
       create: {
         userId,
-        firstName: '',
-        lastName: '',
-        college: parsedData.college !== "" ? parsedData.college : 'Unknown College',
+        firstName:       '',
+        lastName:        '',
+        college:         'Unknown College',
         resumeUrl,
-        parsedSkills: parsedData.skills,
-        experienceYears: parsedData.experienceYears,
-        cgpa: parsedData.cgpa,
+        parsedSkills:    [],
+        experienceYears: 0,
+        cgpa:            0,
       },
     });
   } catch (dbError) {
-    console.error('[DB Write] Student profile update failed:', dbError);
-    res.status(500).json({
-      success: false,
-      message: 'Resume was parsed but could not be saved to the database. Please try again.',
-    });
-    return;
+    console.error('[DB Write] Could not persist resumeUrl:', dbError);
+    // Non-fatal — the worker will upsert the full record anyway
   }
 
+  // Enqueue the heavy work — returns immediately
+  const job = await resumeQueue.add(
+    'parse-resume',
+    { resumeUrl, userId },
+    { jobId: `resume-${userId}-${Date.now()}` }
+  );
 
-  res.status(200).json({
+  console.log(`[Upload] Job ${job.id} enqueued for user ${userId}`);
+
+  // 202 Accepted — processing is happening asynchronously
+  res.status(202).json({
     success: true,
-    message: 'Resume uploaded and parsed successfully.',
+    message: 'Resume uploaded! AI is analysing your skills in the background.',
     data: {
+      jobId:     job.id,
       resumeUrl,
-      parsedSkills: parsedData.skills,
-      experienceYears: parsedData.experienceYears,
-      projects: parsedData.projects,
-      cgpa: parsedData.cgpa,
-      college: parsedData.college,
+      // Skills will arrive via WebSocket event 'resume:parsed'
     },
   });
 };
