@@ -81,7 +81,7 @@ async function fetchActiveJobs(): Promise<JobRecord[]> {
     return JSON.parse(cached) as JobRecord[];
   }
 
-  console.log('[Cache] MISS jobs:all — querying MongoDB');
+  console.log('[Cache] MISS jobs:all — querying DB');
   const jobs = await prisma.job.findMany({
     where: { isActive: true },
     orderBy: { createdAt: 'desc' },
@@ -98,20 +98,7 @@ async function fetchActiveJobs(): Promise<JobRecord[]> {
   return jobs as unknown as JobRecord[];
 }
 
-// =============================================================================
-// checkAndApply
-// =============================================================================
 // POST /api/eligibility/apply/:jobId
-//
-// Full pipeline:
-//  1. Resolve student profile from req.user.userId
-//  2. Resolve job from URL param :jobId
-//  3. Duplicate-application guard (findFirst — no double-apply)
-//  4. calculateMatchScore() — pure local computation, 0 LLM calls
-//  5. Threshold gate — reject if score < APPLY_THRESHOLD (50)
-//  6. Create Application record (matchScore + PENDING status)
-//  7. Return 201 with match score and application id
-// =============================================================================
 export const checkAndApply = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ success: false, message: 'Unauthorized.' });
@@ -188,23 +175,7 @@ export const checkAndApply = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // ── Step 3: Duplicate-application guard ───────────────────────────────────
-    // As documented in schema.prisma, MongoDB+Prisma cannot enforce @@unique
-    // on two ObjectId fields. We enforce it here at the controller layer.
-    const existing = await prisma.application.findFirst({
-      where: { studentId: studentProfile.id, jobId },
-    });
-
-    if (existing) {
-      res.status(409).json({
-        success: false,
-        message: 'You have already applied to this job.',
-        data: { applicationId: existing.id, status: existing.status },
-      });
-      return;
-    }
-
-    // ── Step 4: Calculate match score (pure local — zero LLM tokens) ──────────
+    // ── Step 3: Calculate match score (pure local — zero LLM tokens) ──────────
     const studentInput: StudentMatchInput = {
       parsedSkills:    studentProfile.parsedSkills,
       cgpa:            studentProfile.cgpa,
@@ -240,15 +211,32 @@ export const checkAndApply = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // ── Step 6: Create application record ────────────────────────────────────
-    const application = await prisma.application.create({
-      data: {
-        studentId:  studentProfile.id,
-        jobId,
-        matchScore: matchScore,
-        status:     'PENDING',
-      },
-    });
+    // ── Step 5: Create application record (DB enforces no duplicate applications) ──
+    let application: Awaited<ReturnType<typeof prisma.application.create>>;
+    try {
+      application = await prisma.application.create({
+        data: {
+          studentId:  studentProfile.id,
+          jobId,
+          matchScore: matchScore,
+          status:     'PENDING',
+        },
+      });
+    } catch (createErr: unknown) {
+      const isUniqueViolation =
+        typeof createErr === 'object' &&
+        createErr !== null &&
+        'code' in createErr &&
+        (createErr as { code: string }).code === 'P2002';
+      if (isUniqueViolation) {
+        res.status(409).json({
+          success: false,
+          message: 'You have already applied to this job.',
+        });
+        return;
+      }
+      throw createErr;
+    }
 
     // ── Step 6b: Invalidate the jobs:all cache ────────────────────────────────
     // The Redis cache stores _count.applications at the time the cache was last

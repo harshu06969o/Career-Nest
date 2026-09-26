@@ -10,7 +10,7 @@ import prisma from './prismaClient.js';
 //   2. Passport redirects to Google consent screen
 //   3. Google redirects to /api/auth/google/callback with a `code`
 //   4. Passport exchanges `code` for profile; this `verify` callback fires
-//   5. We find-or-create the user in MongoDB
+//   5. We find-or-create the user in the database
 //   6. The auth.controller googleCallback then issues a JWT and redirects
 // =============================================================================
 

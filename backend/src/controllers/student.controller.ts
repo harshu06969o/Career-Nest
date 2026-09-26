@@ -145,8 +145,26 @@ export const uploadResume = async (req: Request, res: Response): Promise<void> =
   }
 
   const { userId } = req.user;
-  // After CloudinaryStorage, req.file.path is the stable CDN-backed HTTPS URL
-  const resumeUrl = req.file.path;
+
+  // multer-storage-cloudinary v4 populates req.file.path with the secure_url.
+  // However, for resource_type:'raw', some versions use req.file.secure_url.
+  // We try both and prefer the HTTPS URL to guarantee it is fetchable.
+  const fileInfo = req.file as Express.Multer.File & { secure_url?: string; path?: string };
+  const resumeUrl = fileInfo.secure_url ?? fileInfo.path ?? '';
+
+  console.log('[Upload] req.file fields:', {
+    path:        fileInfo.path,
+    secure_url:  fileInfo.secure_url,
+    filename:    fileInfo.filename,
+    originalname: fileInfo.originalname,
+    mimetype:    fileInfo.mimetype,
+  });
+
+  if (!resumeUrl || !resumeUrl.startsWith('http')) {
+    console.error('[Upload] Could not resolve a valid Cloudinary URL from req.file');
+    res.status(500).json({ success: false, message: 'Upload succeeded but could not get file URL. Please try again.' });
+    return;
+  }
 
   // Persist the raw resumeUrl immediately so the student can see it in their
   // profile while the AI is still analysing in the background.

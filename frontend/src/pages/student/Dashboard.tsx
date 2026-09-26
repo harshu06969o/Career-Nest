@@ -76,6 +76,14 @@ function normalizeSkillFrontend(s: string): string {
   return FRONTEND_SKILL_ALIASES[lower] ?? lower;
 }
 
+// Cloudinary raw resource URLs are served as application/octet-stream — the
+// browser cannot render them as PDF natively. Wrapping with Google Docs Viewer
+// forces inline PDF rendering in any browser without any server changes.
+function getViewableResumeUrl(url: string): string {
+  if (!url) return url;
+  return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+}
+
 function analyzeSkillGap(required: string[], studentSkills: string[]) {
   const studentNormalized = new Set(studentSkills.map(s => normalizeSkillFrontend(s)));
   const matched: string[] = [];
@@ -798,7 +806,7 @@ export default function StudentDashboard() {
                       </p>
                     </div>
                   </div>
-                  <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer"
+                  <a href={getViewableResumeUrl(profile.resumeUrl)} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 px-4 py-2 bg-white border border-emerald-200 text-emerald-700
                                text-xs font-bold rounded-xl hover:bg-emerald-100 transition-colors flex-shrink-0">
                     <ExternalLink size={13} />View Resume

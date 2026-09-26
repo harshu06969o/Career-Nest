@@ -92,7 +92,7 @@ async function safeRedisDel(key: string): Promise<void> {
  *
  * @architecture
  * Zero-Token Recurring Cost Strategy: The job description is parsed by the LLM exactly once 
- * during creation. The extracted schema (skills, CGPA, experience) is persisted to MongoDB. 
+ * during creation. The extracted schema (skills, CGPA, experience) is persisted to the database. 
  * All subsequent matching queries execute locally in O(1) time without triggering external APIs.
  */
 export const createJob = async (req: Request, res: Response): Promise<void> => {
@@ -218,7 +218,7 @@ export const getAllJobs = async (req: Request, res: Response): Promise<void> => 
   }
 
   // ── Cache Miss: query MongoDB ──────────────────────────────────────────────
-  console.log('[Cache] MISS jobs:all — querying MongoDB');
+  console.log('[Cache] MISS jobs:all — querying DB');
   try {
     const jobs = await prisma.job.findMany({
       where: { isActive: true },
@@ -434,7 +434,7 @@ export const deleteJob = async (req: Request, res: Response): Promise<void> => {
 //
 // Returns real-time platform-wide counts for the Admin Dashboard.
 // Runs 3 parallel Prisma queries using Promise.all for efficiency.
-// No caching — admin stats are always served fresh from MongoDB.
+// No caching — admin stats are always served fresh.
 // =============================================================================
 export const getAdminStats = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
