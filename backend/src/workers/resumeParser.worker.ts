@@ -1,11 +1,8 @@
 import { Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
-import dotenv from 'dotenv';
 import prisma from '../config/prismaClient.js';
 import { extractTextFromPdf, parseResumeWithLLM } from '../services/llm.service.js';
 import { emitToUser } from '../config/socketServer.js';
-
-dotenv.config();
 
 const redisUrl = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
@@ -115,14 +112,24 @@ async function processResumeJob(job: Job<ResumeParseJobData>): Promise<void> {
  * @returns {Worker<ResumeParseJobData>} The configured BullMQ Worker instance.
  */
 export function createResumeWorker(): Worker<ResumeParseJobData> {
+  const workerConnection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+
+  workerConnection.on('error', (err: Error) => {
+    console.error('[Worker] Redis connection error:', err.message);
+  });
+
   const worker = new Worker<ResumeParseJobData>(
     'resume-parse',
     processResumeJob,
     {
-      connection:  new Redis(redisUrl, { maxRetriesPerRequest: null }),
+      connection:  workerConnection,
       concurrency: 5, // process up to 5 resumes in parallel
     }
   );
+
+  worker.on('error', (err: Error) => {
+    console.error('[Worker] BullMQ Worker error:', err.message);
+  });
 
   worker.on('completed', (job) => {
     console.log(`[Worker] ✅ Job ${job.id} completed successfully`);

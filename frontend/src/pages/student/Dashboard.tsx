@@ -52,7 +52,7 @@ interface MatchedJob {
 type ActiveView = 'dashboard' | 'matches' | 'skill-development' | 'documents' | 'analysis';
 
 // =============================================================================
-// Frontend Skill Alias Map — mirrors backend matcher.service.ts
+// Skill Alias Map — mirrors backend matcher.service.ts normalization
 // =============================================================================
 const FRONTEND_SKILL_ALIASES: Record<string, string> = {
   'dsa': 'data structures and algorithms', 'data structures': 'data structures and algorithms',
@@ -81,9 +81,7 @@ function normalizeSkillFrontend(s: string): string {
   return FRONTEND_SKILL_ALIASES[lower] ?? lower;
 }
 
-// Cloudinary raw resource URLs are served as application/octet-stream — the
-// browser cannot render them as PDF natively. Wrapping with Google Docs Viewer
-// forces inline PDF rendering in any browser without any server changes.
+// Cloudinary raw URLs are application/octet-stream — Google Docs Viewer forces inline PDF rendering.
 function getViewableResumeUrl(url: string): string {
   if (!url) return url;
   return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
@@ -100,7 +98,7 @@ function analyzeSkillGap(required: string[], studentSkills: string[]) {
 }
 
 // =============================================================================
-// Skill Advice Map
+// Skill Advice Map — actionable guidance for every missing skill
 // =============================================================================
 const SKILL_ADVICE: Record<string, string> = {
   'data structures and algorithms': 'Practice on LeetCode — start with NeetCode 150 roadmap. Target 2–3 problems/day.',
@@ -109,9 +107,9 @@ const SKILL_ADVICE: Record<string, string> = {
   'rest api': 'Create a CRUD API with Node.js + Express. Document with Postman/Swagger.',
   'express': 'Build 2–3 REST APIs. Middleware, routing, and error handling are the key interview topics.',
   'python': 'Complete Python basics on freeCodeCamp, then build a web scraper or data analysis script with pandas.',
-  'machine learning': 'Start with Andrew Ng\'s ML Specialization on Coursera. Build a classification project with scikit-learn.',
-  'deep learning': 'Complete fast.ai\'s Practical Deep Learning. Build an image classifier using PyTorch or TensorFlow.',
-  'docker': 'Complete Docker\'s official "Get Started" guide (2 hrs). Containerize one of your existing projects.',
+  'machine learning': "Start with Andrew Ng's ML Specialization on Coursera. Build a classification project with scikit-learn.",
+  'deep learning': "Complete fast.ai's Practical Deep Learning. Build an image classifier using PyTorch or TensorFlow.",
+  'docker': "Complete Docker's official \"Get Started\" guide (2 hrs). Containerize one of your existing projects.",
   'kubernetes': 'After Docker, do the official Kubernetes Basics tutorial. Focus on Pods, Services, and Deployments.',
   'ci cd': 'Set up a GitHub Actions pipeline: lint → test → build. This is a top hiring differentiator.',
   'sql': 'Complete SQLZoo or Mode Analytics SQL Tutorial. Practice JOINs, GROUP BY, and window functions.',
@@ -129,8 +127,8 @@ const SKILL_ADVICE: Record<string, string> = {
   'computer networks': 'Study OSI model, TCP/IP, HTTP/HTTPS, DNS, and sockets.',
   'operating system': 'Focus on process management, memory management, deadlocks, and threading.',
   'database management system': 'Study normalization (1NF–3NF–BCNF), ACID properties, transactions, and indexing.',
-  'tensorflow': 'Complete TensorFlow\'s official tutorials. Build a CNN for image classification.',
-  'pytorch': 'Complete fast.ai\'s PyTorch course. Build a custom neural network from scratch.',
+  'tensorflow': "Complete TensorFlow's official tutorials. Build a CNN for image classification.",
+  'pytorch': "Complete fast.ai's PyTorch course. Build a custom neural network from scratch.",
   'scikit-learn': 'Build end-to-end ML pipelines: preprocessing → training → evaluation → tuning.',
   'next.js': 'Build a full-stack app using Next.js App Router with server components and API routes.',
   'graphql': 'Add a GraphQL API using Apollo Server. Compare REST vs GraphQL in your project README.',
@@ -138,7 +136,7 @@ const SKILL_ADVICE: Record<string, string> = {
 };
 
 // =============================================================================
-// SVG Radar Chart
+// Radar Chart — SVG-based skill radar
 // =============================================================================
 function RadarChart({ values, size = 180 }: { values: { label: string; value: number }[]; size?: number }) {
   const center = size / 2;
@@ -159,25 +157,25 @@ function RadarChart({ values, size = 180 }: { values: { label: string; value: nu
       {/* Grid rings */}
       {gridLevels.map(level => {
         const pts = values.map((_, i) => { const p = toXY(i, level); return `${p.x},${p.y}`; }).join(' ');
-        return <polygon key={level} points={pts} fill="none" stroke="#e2e8f0" strokeWidth="1" />;
+        return <polygon key={level} points={pts} fill="none" stroke="#E8E8E4" strokeWidth="1" />;
       })}
       {/* Axis lines */}
       {values.map((_, i) => {
         const p = toXY(i, 1);
-        return <line key={i} x1={center} y1={center} x2={p.x} y2={p.y} stroke="#e2e8f0" strokeWidth="1" />;
+        return <line key={i} x1={center} y1={center} x2={p.x} y2={p.y} stroke="#E8E8E4" strokeWidth="1" />;
       })}
-      {/* Data fill */}
-      <polygon points={polygon} fill="rgba(99,102,241,0.15)" stroke="#6366f1" strokeWidth="2" className="radar-polygon" />
+      {/* Data polygon fill */}
+      <polygon points={polygon} fill="rgba(79,70,229,0.12)" stroke="#4F46E5" strokeWidth="1.5" className="radar-polygon" />
       {/* Data dots */}
       {dataPoints.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="4" fill="#6366f1" stroke="white" strokeWidth="2" className="score-glow" />
+        <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#4F46E5" stroke="white" strokeWidth="1.5" className="score-glow" />
       ))}
       {/* Labels */}
       {values.map((v, i) => {
         const lp = toXY(i, 1.22);
         return (
           <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle"
-            fontSize="9" fontWeight="600" fill="#64748b" fontFamily="Inter, sans-serif">
+            fontSize="9" fontWeight="600" fill="#6B6B68" fontFamily="Inter, sans-serif">
             {v.label}
           </text>
         );
@@ -187,7 +185,7 @@ function RadarChart({ values, size = 180 }: { values: { label: string; value: nu
 }
 
 // =============================================================================
-// StudentDashboard
+// StudentDashboard — Main Component
 // =============================================================================
 export default function StudentDashboard() {
 
@@ -197,7 +195,7 @@ export default function StudentDashboard() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [uploading,      setUploading]      = useState(false);
-  const [isAnalyzing,    setIsAnalyzing]    = useState(false); // shows ResumeAnalyzing overlay
+  const [isAnalyzing,    setIsAnalyzing]    = useState(false);
   const [applying,       setApplying]       = useState<string | null>(null);
   const [appliedJobs,    setAppliedJobs]    = useState<Set<string>>(new Set());
   const [dragOver,       setDragOver]       = useState(false);
@@ -206,10 +204,11 @@ export default function StudentDashboard() {
   const [matchFilter,    setMatchFilter]    = useState<'all' | 'eligible' | 'applied'>('all');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Real-time Chat state
+  // Real-time chat integration
   const openChat = useChatStore((s) => s.openChat);
   const [searchParams] = useSearchParams();
 
+  // Open chat from URL query param (e.g. notification deep-link)
   useEffect(() => {
     const qConvId = searchParams.get('conversationId');
     if (qConvId) {
@@ -217,13 +216,12 @@ export default function StudentDashboard() {
     }
   }, [searchParams, openChat]);
 
-
-  // ── Fetchers ───────────────────────────────────────────────────────────────
+  // ── Data Fetchers ──────────────────────────────────────────────────────────
   const fetchProfile = useCallback(async () => {
     try {
       const { data } = await api.get<{ data: StudentProfile }>('/student/profile');
       setProfile(data.data);
-    } catch { /* 404 = not yet created */ } finally { setLoadingProfile(false); }
+    } catch { /* 404 = profile not yet created */ } finally { setLoadingProfile(false); }
   }, []);
 
   const fetchMatches = useCallback(async () => {
@@ -236,7 +234,7 @@ export default function StudentDashboard() {
     } catch { /* silently fail */ } finally { setLoadingMatches(false); }
   }, []);
 
-  // ── WebSocket: resume:parsed / resume:parse-failed ─────────────────────────
+  // ── WebSocket listeners — resume parsing and application status changes ────
   useEffect(() => {
     const socket = getSocket();
 
@@ -248,7 +246,7 @@ export default function StudentDashboard() {
       resumeUrl:       string;
       skillCount:      number;
     }) => {
-      console.log('[Dashboard] Received resume:parsed via WebSocket:', data);
+      console.log('[Dashboard] resume:parsed', data);
       setProfile(prev => prev ? {
         ...prev,
         parsedSkills:    data.parsedSkills,
@@ -264,14 +262,14 @@ export default function StudentDashboard() {
     };
 
     const onFailed = (data: { message: string }) => {
-      console.warn('[Dashboard] Received resume:parse-failed via WebSocket:', data);
+      console.warn('[Dashboard] resume:parse-failed', data);
       setIsAnalyzing(false);
       setUploading(false);
       toast.error(data.message ?? 'AI parsing failed. Please try again.');
     };
 
     const onStatusChanged = (data: { applicationId: string; jobTitle: string; status: string; conversationId?: string }) => {
-      console.log('[Dashboard] Received application:status_changed via WebSocket:', data);
+      console.log('[Dashboard] application:status_changed', data);
       if (data.status === 'SHORTLISTED') {
         toast.success(`🎉 Congratulations! You have been Shortlisted for "${data.jobTitle}"! Live recruiter chat is now unlocked.`, { duration: 8000 });
         playNotificationChime();
@@ -282,32 +280,31 @@ export default function StudentDashboard() {
       void fetchProfile();
     };
 
-    socket.on('resume:parsed',       onParsed);
-    socket.on('resume:parse-failed', onFailed);
+    socket.on('resume:parsed',             onParsed);
+    socket.on('resume:parse-failed',       onFailed);
     socket.on('application:status_changed', onStatusChanged);
 
     return () => {
-      socket.off('resume:parsed',       onParsed);
-      socket.off('resume:parse-failed', onFailed);
+      socket.off('resume:parsed',             onParsed);
+      socket.off('resume:parse-failed',       onFailed);
       socket.off('application:status_changed', onStatusChanged);
     };
   }, [fetchMatches, fetchProfile]);
 
-  // ── Polling Fallback during isAnalyzing ─────────────────────────────────────
-  // If the WebSocket event is missed, dropped, or blocked by a proxy,
-  // this polling safety net ensures the user NEVER gets stuck at 92%.
+  // ── Polling fallback — safety net if WebSocket event is dropped ─────────────
+  // Polls for parsed skills every 3s for up to 24s while isAnalyzing is true.
   useEffect(() => {
     if (!isAnalyzing) return;
 
     let pollCount = 0;
-    const maxPolls = 8; // 8 * 3s = 24 seconds max
+    const maxPolls = 8;
 
     const interval = setInterval(async () => {
       pollCount++;
       try {
         const { data } = await api.get<{ data: StudentProfile }>('/student/profile');
         if (data.data?.parsedSkills && data.data.parsedSkills.length > 0) {
-          console.log('[Dashboard Polling Fallback] Detected parsed skills in DB:', data.data.parsedSkills.length);
+          console.log('[Dashboard Polling] Skills detected:', data.data.parsedSkills.length);
           setProfile(data.data);
           setIsAnalyzing(false);
           toast.success(`✨ AI extracted ${data.data.parsedSkills.length} skills from your resume!`, { duration: 5000 });
@@ -315,12 +312,10 @@ export default function StudentDashboard() {
           clearInterval(interval);
           return;
         }
-      } catch {
-        // Silently retry
-      }
+      } catch { /* silently retry */ }
 
       if (pollCount >= maxPolls) {
-        console.log('[Dashboard Polling Fallback] Max attempts reached, auto-closing overlay');
+        console.log('[Dashboard Polling] Max attempts reached, closing overlay');
         setIsAnalyzing(false);
         void fetchProfile();
         void fetchMatches();
@@ -331,6 +326,7 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, [isAnalyzing, fetchMatches, fetchProfile]);
 
+  // Initial data load
   useEffect(() => { void fetchProfile(); void fetchMatches(); }, [fetchProfile, fetchMatches]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -341,12 +337,11 @@ export default function StudentDashboard() {
     const form = new FormData();
     form.append('resume', file);
     try {
-      // Backend now returns 202 Accepted immediately — the real work is in the background worker
+      // Backend responds 202 Accepted immediately — BullMQ worker handles LLM parsing asynchronously
       await api.post('/student/resume', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       setUploading(false);
-      setIsAnalyzing(true); // show the premium analyzing overlay
+      setIsAnalyzing(true);
       toast('📤 Resume received! AI is now analysing your skills…', { icon: '🤖', duration: 4000 });
-      // Result will arrive via socket event 'resume:parsed' — no polling needed
     } catch (err: unknown) {
       toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Upload failed.');
       setUploading(false);
@@ -368,16 +363,16 @@ export default function StudentDashboard() {
   const skillMastery = useMemo(() => {
     if (!profile?.parsedSkills.length) return [];
     return profile.parsedSkills.slice(0, 7).map(skill => {
-      const normalized = normalizeSkillFrontend(skill);
+      const normalized  = normalizeSkillFrontend(skill);
       const demandCount = matches.filter(m => m.job.requiredSkills.some(s => normalizeSkillFrontend(s) === normalized)).length;
       const pct = matches.length > 0 ? Math.max(8, Math.round((demandCount / matches.length) * 100)) : 70;
       return { skill, pct };
     }).sort((a, b) => b.pct - a.pct);
   }, [profile, matches]);
 
-  // ── Computed: Skill Development data ──────────────────────────────────────
+  // ── Computed: Skill Development ────────────────────────────────────────────
   const skillDevData = useMemo(() => {
-    if (!profile || !matches.length) return { missing: [], have: [] };
+    if (!profile || !matches.length) return { missing: [] };
     const missingFreq: Record<string, number> = {};
     matches.forEach(m => {
       analyzeSkillGap(m.job.requiredSkills, profile.parsedSkills).missing.forEach(s => {
@@ -395,7 +390,7 @@ export default function StudentDashboard() {
     return { missing };
   }, [profile, matches]);
 
-  // ── Computed: Analysis data ────────────────────────────────────────────────
+  // ── Computed: Profile Analysis ─────────────────────────────────────────────
   const analysisData = useMemo(() => {
     if (!profile) return null;
     const totalRequired = matches.reduce((s, m) => s + m.job.requiredSkills.length, 0);
@@ -416,8 +411,10 @@ export default function StudentDashboard() {
       ? 'Developing profile. Prioritize building the top missing skills shown in Skill Development.'
       : 'Early stage. Upload an updated resume with more technical skills to improve match rate.';
 
-    return { skillMatchPct, cgpaPct, expPct, appliedCount, topScore, overallScore, recommendation: rec,
-      appliedJobs: matches.filter(m => appliedJobs.has(m.job.id)) };
+    return {
+      skillMatchPct, cgpaPct, expPct, appliedCount, topScore, overallScore, recommendation: rec,
+      appliedJobs: matches.filter(m => appliedJobs.has(m.job.id)),
+    };
   }, [profile, matches, appliedJobs]);
 
   const displayName   = profile ? `${profile.firstName}${profile.lastName ? ' ' + profile.lastName : ''}`.trim() : 'Student';
@@ -431,17 +428,17 @@ export default function StudentDashboard() {
 
   // ── Sidebar nav config ─────────────────────────────────────────────────────
   const navItems: { view: ActiveView; icon: React.ReactNode; label: string }[] = [
-    { view: 'dashboard',        icon: <LayoutDashboard size={15} />, label: 'Dashboard'         },
-    { view: 'matches',          icon: <Briefcase size={15} />,       label: 'Job Matches'        },
-    { view: 'skill-development',icon: <Target size={15} />,          label: 'Skill Development'  },
-    { view: 'documents',        icon: <FileText size={15} />,        label: 'Documents'          },
-    { view: 'analysis',         icon: <BarChart2 size={15} />,       label: 'My Analysis'        },
+    { view: 'dashboard',         icon: <LayoutDashboard size={14} />, label: 'Dashboard'        },
+    { view: 'matches',           icon: <Briefcase size={14} />,       label: 'Job Matches'       },
+    { view: 'skill-development', icon: <Target size={14} />,          label: 'Skill Development' },
+    { view: 'documents',         icon: <FileText size={14} />,        label: 'Documents'         },
+    { view: 'analysis',          icon: <BarChart2 size={14} />,       label: 'My Analysis'       },
   ];
 
   return (
     <div className="flex gap-6 items-start w-full">
 
-      {/* AI Analyzing overlay — shown while BullMQ worker processes the resume */}
+      {/* AI Analyzing overlay — displayed while BullMQ worker processes the resume */}
       {isAnalyzing && (
         <ResumeAnalyzing
           onComplete={() => {
@@ -458,61 +455,87 @@ export default function StudentDashboard() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          LEFT SIDEBAR
+          LEFT SIDEBAR — sticky profile + navigation
       ══════════════════════════════════════════════════════════════════════ */}
-      <aside className="w-56 shrink-0 hidden lg:flex flex-col gap-3 sticky top-24 self-start animate-slide-in-left">
+      <aside className="w-52 shrink-0 hidden lg:flex flex-col gap-3 sticky top-20 self-start animate-slide-in-left">
 
         {/* Profile card */}
-        <div className="enterprise-card p-5 flex flex-col items-center text-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600
-                          flex items-center justify-center shadow-md ring-4 ring-indigo-100">
-            <span className="text-white font-black text-xl">
+        <div className="cn-card p-4 flex flex-col items-center text-center gap-3">
+          {/* Avatar circle */}
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center shadow-sm"
+            style={{ background: 'linear-gradient(135deg, #4F46E5, #7C3AED)' }}
+          >
+            <span className="text-white font-black text-lg">
               {profile?.firstName?.[0]?.toUpperCase() ?? '?'}
             </span>
           </div>
+
           {loadingProfile ? (
             <div className="space-y-2 w-full">
-              <div className="skeleton h-3.5 w-24 mx-auto" />
-              <div className="skeleton h-3 w-32 mx-auto" />
+              <div className="skeleton h-3 w-20 mx-auto" />
+              <div className="skeleton h-2.5 w-28 mx-auto" />
             </div>
           ) : (
             <>
               <div>
-                <p className="text-sm font-bold text-slate-900">{displayName}</p>
-                <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[180px]">{profile?.college ?? 'College not set'}</p>
+                <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)' }}>
+                  {displayName}
+                </p>
+                <p className="text-xs mt-0.5 truncate max-w-[180px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {profile?.college ?? 'College not set'}
+                </p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold rounded-full">
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                <span
+                  className="px-2 py-0.5 text-xs font-bold rounded-full"
+                  style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)', border: '1px solid var(--color-brand-border)' }}
+                >
                   CGPA {profile?.cgpa.toFixed(1) ?? '—'}
                 </span>
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full border border-slate-200">
+                <span
+                  className="px-2 py-0.5 text-xs font-semibold rounded-full"
+                  style={{ background: 'var(--color-border-subtle)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+                >
                   {profile?.experienceYears ?? 0} yrs
                 </span>
               </div>
-              <div className={cn(
-                'w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold',
-                profile?.resumeUrl ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                   : 'bg-red-50 text-red-600 border border-red-100',
-              )}>
-                {profile?.resumeUrl ? <><CheckCircle size={11} /> Resume Active</> : <><UploadCloud size={11} /> No Resume</>}
+              {/* Resume status indicator */}
+              <div
+                className={cn('w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold')}
+                style={profile?.resumeUrl
+                  ? { background: 'var(--color-success-light)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)' }
+                  : { background: 'var(--color-danger-light)', color: 'var(--color-danger)', border: '1px solid var(--color-danger-border)' }
+                }
+              >
+                {profile?.resumeUrl
+                  ? <><CheckCircle size={10} /> Resume Active</>
+                  : <><UploadCloud size={10} /> No Resume</>
+                }
               </div>
             </>
           )}
         </div>
 
-        {/* Nav */}
-        <div className="enterprise-card p-2 flex flex-col gap-0.5">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-1.5">Navigation</p>
+        {/* Navigation links */}
+        <div className="cn-card p-2 flex flex-col gap-0.5">
+          <p className="type-label px-3 py-1.5">Navigation</p>
           {navItems.map(({ view, icon, label }) => (
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={cn('nav-item w-full text-left', activeView === view && 'active')}
+              className={cn('nav-item', activeView === view && 'active')}
             >
-              <span className="nav-icon text-slate-400">{icon}</span>
+              <span className="nav-icon" style={{ color: activeView === view ? 'var(--color-brand)' : 'var(--color-text-tertiary)' }}>
+                {icon}
+              </span>
               <span>{label}</span>
+              {/* Job match count badge */}
               {view === 'matches' && matches.length > 0 && (
-                <span className="ml-auto text-[10px] font-bold bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">
+                <span
+                  className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)' }}
+                >
                   {matches.length}
                 </span>
               )}
@@ -520,77 +543,103 @@ export default function StudentDashboard() {
           ))}
         </div>
 
-        {/* Upload CTA */}
+        {/* Resume upload CTA */}
         <button
           onClick={() => { setActiveView('documents'); fileRef.current?.click(); }}
           disabled={uploading}
-          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-indigo-600 text-white
-                     text-sm font-bold rounded-xl hover:bg-indigo-700 active:scale-[0.97] transition-all
-                     shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white rounded-xl transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: 'var(--color-brand)', fontFamily: 'var(--font-heading)' }}
+          onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = 'var(--color-brand-hover)'; }}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-brand)')}
         >
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+          {uploading ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />}
           {uploading ? 'Parsing…' : profile?.resumeUrl ? 'Update Resume' : 'Upload Resume'}
         </button>
 
+        {/* Hidden file input */}
         <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) void handleUpload(f); e.target.value = ''; }} />
       </aside>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          MAIN CONTENT — view switcher
+          MAIN CONTENT
       ══════════════════════════════════════════════════════════════════════ */}
       <main className="flex-1 min-w-0">
 
         {/* ─── VIEW: DASHBOARD ─────────────────────────────────────────────── */}
         {activeView === 'dashboard' && (
           <div className="space-y-5 animate-view-enter">
-            {/* Header */}
+
+            {/* Page header */}
             <div className="section-header">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-900">Student Talent Hub</h1>
-                  <p className="text-slate-500 mt-0.5 text-sm">Welcome back, <span className="font-semibold text-slate-700">{displayName}</span></p>
+                  <h1
+                    className="text-2xl font-black"
+                    style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em' }}
+                  >
+                    Student Hub
+                  </h1>
+                  <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                    Welcome back, <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>{displayName}</span>
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => openChat(null)}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all"
+                    style={{ background: '#FFFFFF', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', boxShadow: 'var(--shadow-xs)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-brand)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
                   >
-                    <MessageSquare size={14} className="text-indigo-600" />
-                    <span>Live Chat</span>
+                    <MessageSquare size={13} style={{ color: 'var(--color-brand)' }} />
+                    Live Chat
                   </button>
                   <NotificationBell onOpenChat={(convId) => openChat(convId ?? null)} />
                   {profile && (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
-                      <CheckCircle size={14} className="text-emerald-600" />
-                      <span className="text-xs font-semibold text-emerald-700">Profile Active</span>
+                    <div
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold"
+                      style={{ background: 'var(--color-success-light)', border: '1px solid var(--color-success-border)', color: 'var(--color-success)' }}
+                    >
+                      <CheckCircle size={12} />
+                      Profile Active
                     </div>
                   )}
-                  <button onClick={() => void fetchMatches()} disabled={loadingMatches}
-                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                    <RefreshCw size={15} className={loadingMatches ? 'animate-spin' : ''} />
+                  <button
+                    onClick={() => void fetchMatches()}
+                    disabled={loadingMatches}
+                    className="p-1.5 rounded-lg transition-colors"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-brand)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}
+                  >
+                    <RefreshCw size={14} className={loadingMatches ? 'animate-spin' : ''} />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Stats */}
+            {/* Metric stat cards */}
             <div className="grid grid-cols-3 gap-4">
               {loadingProfile ? Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="stat-card"><div className="skeleton h-3.5 w-20 mb-4" /><div className="skeleton h-8 w-14 mb-1" /><div className="skeleton h-3 w-24" /></div>
+                <div key={i} className="stat-card">
+                  <div className="skeleton h-3 w-20 mb-4" /><div className="skeleton h-7 w-14 mb-1" /><div className="skeleton h-2.5 w-24" />
+                </div>
               )) : [
-                { label: 'Skills Parsed', value: profile?.parsedSkills.length ?? 0, sub: 'from your resume', icon: <Zap size={18} className="text-indigo-600" />, bg: 'bg-indigo-50' },
-                { label: 'Job Matches',   value: matches.length,  sub: `${eligibleCount} eligible`, icon: <Trophy size={18} className="text-emerald-600" />, bg: 'bg-emerald-50' },
-                { label: 'Top Score',     value: matches[0] ? `${matches[0].matchScore}%` : '—', sub: 'best AI match', icon: <TrendingUp size={18} className="text-violet-600" />, bg: 'bg-violet-50' },
-              ].map(({ label, value, sub, icon, bg }, i) => (
+                { label: 'Skills Parsed', value: profile?.parsedSkills.length ?? 0, sub: 'from your resume', icon: <Zap size={16} style={{ color: 'var(--color-brand)' }} />, iconBg: 'var(--color-brand-light)' },
+                { label: 'Job Matches',   value: matches.length,  sub: `${eligibleCount} eligible`, icon: <Trophy size={16} className="text-emerald-600" />, iconBg: '#F0FDF4' },
+                { label: 'Top Score',     value: matches[0] ? `${matches[0].matchScore}%` : '—', sub: 'best AI match', icon: <TrendingUp size={16} className="text-violet-600" />, iconBg: '#F5F3FF' },
+              ].map(({ label, value, sub, icon, iconBg }, i) => (
                 <div key={label} className={cn('stat-card animate-view-enter', i === 0 && 'stagger-1', i === 1 && 'stagger-2', i === 2 && 'stagger-3')}>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-                    <div className={cn('p-2 rounded-lg', bg)}>{icon}</div>
+                    <span className="type-label">{label}</span>
+                    <div className="p-2 rounded-lg" style={{ background: iconBg }}>{icon}</div>
                   </div>
-                  <p className="text-3xl font-black text-slate-900 mb-0.5 animate-count">{value}</p>
-                  <p className="text-xs text-slate-400 font-medium">{sub}</p>
+                  <p className="text-2xl font-black mb-0.5 animate-count" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)', letterSpacing: '-0.04em' }}>
+                    {value}
+                  </p>
+                  <p className="type-caption">{sub}</p>
                 </div>
               ))}
             </div>
@@ -598,60 +647,79 @@ export default function StudentDashboard() {
             {/* Profile overview + Skill mastery */}
             {profile && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="enterprise-card p-5 animate-view-enter stagger-2">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
-                    <GraduationCap size={13} className="text-indigo-400" />Profile Overview
+
+                {/* Profile overview */}
+                <div className="cn-card p-5 animate-view-enter stagger-2">
+                  <h2 className="type-label flex items-center gap-1.5 mb-4">
+                    <GraduationCap size={12} style={{ color: 'var(--color-brand)' }} />
+                    Profile Overview
                   </h2>
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     {[
-                      { label: 'CGPA',    value: profile.cgpa.toFixed(1),          accent: 'text-indigo-700' },
-                      { label: 'Exp.',    value: `${profile.experienceYears} yrs`,  accent: 'text-slate-800' },
-                      { label: 'Resume',  value: profile.resumeUrl ? 'Active ✓' : 'Missing ✗', accent: profile.resumeUrl ? 'text-emerald-700' : 'text-red-600' },
+                      { label: 'CGPA',    value: profile.cgpa.toFixed(1),          accent: 'var(--color-brand)' },
+                      { label: 'Exp.',    value: `${profile.experienceYears} yrs`,  accent: 'var(--color-text-primary)' },
+                      { label: 'Resume',  value: profile.resumeUrl ? 'Active ✓' : 'Missing ✗', accent: profile.resumeUrl ? 'var(--color-success)' : 'var(--color-danger)' },
                     ].map(({ label, value, accent }) => (
-                      <div key={label} className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-center">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">{label}</p>
-                        <p className={cn('text-sm font-black truncate', accent)}>{value}</p>
+                      <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                        <p className="type-label mb-1">{label}</p>
+                        <p className="text-sm font-black truncate" style={{ color: accent, fontFamily: 'var(--font-heading)' }}>{value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 mb-4">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 font-semibold">College</p>
-                    <p className="text-sm font-bold text-slate-800 truncate">{profile.college}</p>
+                  <div className="rounded-xl p-3 mb-4" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                    <p className="type-label mb-0.5">College</p>
+                    <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{profile.college}</p>
                   </div>
                   {profile.parsedSkills.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 font-bold flex items-center gap-1"><Zap size={10} className="text-indigo-400" />Parsed Skills</p>
+                      <p className="type-label flex items-center gap-1 mb-2"><Zap size={10} style={{ color: 'var(--color-brand)' }} />Parsed Skills</p>
                       <div className="flex flex-wrap gap-1">
                         {profile.parsedSkills.slice(0, 12).map(skill => (
-                          <span key={skill} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] font-semibold rounded-md">{skill}</span>
+                          <span key={skill} className="text-[11px] font-medium px-2 py-0.5 rounded-md"
+                            style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)', border: '1px solid var(--color-brand-border)' }}>
+                            {skill}
+                          </span>
                         ))}
-                        {profile.parsedSkills.length > 12 && <span className="text-xs text-slate-400 font-medium self-center">+{profile.parsedSkills.length - 12} more</span>}
+                        {profile.parsedSkills.length > 12 && (
+                          <span className="text-xs self-center" style={{ color: 'var(--color-text-tertiary)' }}>+{profile.parsedSkills.length - 12} more</span>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Skill Mastery */}
-                <div className="enterprise-card p-5 animate-view-enter stagger-3">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                    <BarChart2 size={13} className="text-indigo-400" />Skill Mastery
+                {/* Skill mastery bars */}
+                <div className="cn-card p-5 animate-view-enter stagger-3">
+                  <h2 className="type-label flex items-center gap-1.5 mb-1">
+                    <BarChart2 size={12} style={{ color: 'var(--color-brand)' }} />
+                    Skill Mastery
                   </h2>
-                  <p className="text-[10px] text-slate-400 mb-4">% of available jobs requiring each skill</p>
+                  <p className="type-caption mb-4">% of available jobs requiring each skill</p>
                   {skillMastery.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-28 text-center">
-                      <UploadCloud size={28} className="text-slate-300 mb-2" /><p className="text-sm text-slate-400">Upload resume to see skill demand</p>
+                      <UploadCloud size={24} className="mb-2" style={{ color: 'var(--color-text-tertiary)' }} />
+                      <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Upload resume to see skill demand</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {skillMastery.map(({ skill, pct }, i) => (
                         <div key={skill} className={cn('animate-view-enter', `stagger-${Math.min(i + 1, 6)}`)}>
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-semibold text-slate-700 capitalize truncate max-w-[70%]">{skill}</span>
-                            <span className="text-xs font-bold text-indigo-600 ml-2">{pct}%</span>
+                            <span className="text-xs font-semibold capitalize truncate max-w-[70%]" style={{ color: 'var(--color-text-primary)' }}>{skill}</span>
+                            <span className="text-xs font-bold ml-2" style={{ color: 'var(--color-brand)' }}>{pct}%</span>
                           </div>
-                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className={cn('h-full rounded-full skill-bar-fill', pct >= 70 ? 'bg-gradient-to-r from-indigo-500 to-violet-500' : pct >= 40 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-amber-400 to-orange-400')}
-                              style={{ width: `${pct}%` }} />
+                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                            <div
+                              className="h-full rounded-full skill-bar-fill"
+                              style={{
+                                width: `${pct}%`,
+                                background: pct >= 70
+                                  ? 'linear-gradient(90deg, #4F46E5, #7C3AED)'
+                                  : pct >= 40
+                                  ? 'linear-gradient(90deg, #16A34A, #0D9488)'
+                                  : 'linear-gradient(90deg, #D97706, #EA580C)',
+                              }}
+                            />
                           </div>
                         </div>
                       ))}
@@ -662,16 +730,23 @@ export default function StudentDashboard() {
             )}
 
             {/* Quick match preview */}
-            <div className="enterprise-card p-6 animate-view-enter stagger-4">
+            <div className="cn-card p-5 animate-view-enter stagger-4">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <Briefcase size={15} className="text-indigo-500" />Job Match Feed
-                  {matches.length > 0 && <span className="ml-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">{matches.length}</span>}
+                <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+                  <Briefcase size={14} style={{ color: 'var(--color-brand)' }} />
+                  Job Match Feed
+                  {matches.length > 0 && (
+                    <span className="ml-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)' }}>
+                      {matches.length}
+                    </span>
+                  )}
                 </h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-lg uppercase tracking-wide">AI Match</span>
+                  <span className="type-label px-2 py-1 rounded-lg" style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)' }}>AI Match</span>
                   {matches.length > 3 && (
-                    <button onClick={() => setActiveView('matches')} className="text-xs text-indigo-600 font-semibold hover:underline underline-offset-2">View All →</button>
+                    <button onClick={() => setActiveView('matches')} className="text-xs font-semibold hover:underline" style={{ color: 'var(--color-brand)' }}>
+                      View All →
+                    </button>
                   )}
                 </div>
               </div>
@@ -695,22 +770,27 @@ export default function StudentDashboard() {
             <div className="section-header">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h1 className="text-2xl font-black text-slate-900">Job Matches</h1>
-                  <p className="text-slate-500 mt-0.5 text-sm">AI-ranked roles based on your skills, CGPA and experience</p>
+                  <h1 className="text-2xl font-black" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em' }}>Job Matches</h1>
+                  <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>AI-ranked roles based on your skills, CGPA, and experience</p>
                 </div>
                 <button onClick={() => void fetchMatches()} disabled={loadingMatches}
-                  className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                  <RefreshCw size={15} className={loadingMatches ? 'animate-spin' : ''} />
+                  className="p-1.5 rounded-lg transition-colors" style={{ color: 'var(--color-text-tertiary)' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-brand)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-tertiary)')}>
+                  <RefreshCw size={14} className={loadingMatches ? 'animate-spin' : ''} />
                 </button>
               </div>
             </div>
 
-            {/* Filter tabs */}
-            <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit border border-slate-200">
+            {/* Filter pills */}
+            <div className="flex items-center gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)' }}>
               {([['all', 'All'], ['eligible', `Eligible (${eligibleCount})`], ['applied', `Applied (${appliedJobs.size})`]] as const).map(([key, label]) => (
                 <button key={key} onClick={() => setMatchFilter(key)}
-                  className={cn('px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200',
-                    matchFilter === key ? 'bg-white text-indigo-700 shadow-sm border border-indigo-100' : 'text-slate-500 hover:text-slate-700')}>
+                  className={cn('px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200')}
+                  style={matchFilter === key
+                    ? { background: '#FFFFFF', color: 'var(--color-brand)', border: '1px solid var(--color-brand-border)', boxShadow: 'var(--shadow-xs)' }
+                    : { color: 'var(--color-text-secondary)' }
+                  }>
                   {label}
                 </button>
               ))}
@@ -734,89 +814,100 @@ export default function StudentDashboard() {
         {activeView === 'skill-development' && (
           <div className="space-y-5 animate-view-enter">
             <div className="section-header">
-              <h1 className="text-2xl font-black text-slate-900">Skill Development</h1>
-              <p className="text-slate-500 mt-0.5 text-sm">
+              <h1 className="text-2xl font-black" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em' }}>Skill Development</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                 Prioritised learning roadmap based on {matches.length} available job{matches.length !== 1 ? 's' : ''}
               </p>
             </div>
 
             {!profile ? (
-              <div className="enterprise-card p-12 text-center">
-                <UploadCloud size={36} className="text-slate-300 mx-auto mb-3" />
-                <p className="font-semibold text-slate-700">Upload your resume first</p>
-                <p className="text-slate-400 text-sm mt-1">We need your parsed skills to generate a roadmap</p>
+              <div className="cn-card p-12 text-center">
+                <UploadCloud size={32} className="mx-auto mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
+                <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Upload your resume first</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>We need your parsed skills to generate a roadmap</p>
                 <button onClick={() => fileRef.current?.click()} className="btn-primary mt-4">Upload Resume</button>
               </div>
             ) : skillDevData.missing.length === 0 && matches.length === 0 ? (
-              <div className="enterprise-card p-12 text-center">
-                <Briefcase size={36} className="text-slate-300 mx-auto mb-3" />
-                <p className="font-semibold text-slate-700">No job matches to analyse yet</p>
-                <p className="text-slate-400 text-sm mt-1">Job matches drive the skill gap analysis</p>
+              <div className="cn-card p-12 text-center">
+                <Briefcase size={32} className="mx-auto mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
+                <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>No job matches to analyse yet</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>Job matches drive the skill gap analysis</p>
               </div>
             ) : skillDevData.missing.length === 0 ? (
-              <div className="enterprise-card p-8 text-center border-emerald-200 bg-emerald-50">
-                <CheckCircle size={36} className="text-emerald-500 mx-auto mb-3" />
-                <p className="font-bold text-emerald-800 text-lg">You cover all required skills! 🎉</p>
-                <p className="text-emerald-700 text-sm mt-1">Your resume matches every required skill across all available jobs.</p>
+              <div className="cn-card p-8 text-center" style={{ borderColor: 'var(--color-success-border)', background: 'var(--color-success-light)' }}>
+                <CheckCircle size={32} className="mx-auto mb-3" style={{ color: 'var(--color-success)' }} />
+                <p className="font-bold text-lg" style={{ color: 'var(--color-success)' }}>You cover all required skills! 🎉</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-success)' }}>Your resume matches every required skill across all available jobs.</p>
               </div>
             ) : (
               <>
-                {/* Summary stats */}
+                {/* Summary stat cards */}
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: 'Skills to Build', value: skillDevData.missing.length, icon: <Target size={18} className="text-red-500" />, bg: 'bg-red-50' },
-                    { label: 'Skills You Have', value: profile.parsedSkills.length, icon: <CheckCircle size={18} className="text-emerald-600" />, bg: 'bg-emerald-50' },
-                    { label: 'Top Priority',    value: skillDevData.missing[0]?.skill ?? '—', icon: <Star size={18} className="text-amber-500" />, bg: 'bg-amber-50', small: true },
+                    { label: 'Skills to Build', value: skillDevData.missing.length, icon: <Target size={16} style={{ color: 'var(--color-danger)' }} />, bg: 'var(--color-danger-light)' },
+                    { label: 'Skills You Have', value: profile.parsedSkills.length, icon: <CheckCircle size={16} className="text-emerald-600" />, bg: '#F0FDF4' },
+                    { label: 'Top Priority',    value: skillDevData.missing[0]?.skill ?? '—', icon: <Star size={16} className="text-amber-500" />, bg: '#FFFBEB', small: true },
                   ].map(({ label, value, icon, bg, small }) => (
                     <div key={label} className="stat-card animate-view-enter">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-                        <div className={cn('p-2 rounded-lg', bg)}>{icon}</div>
+                        <span className="type-label">{label}</span>
+                        <div className="p-2 rounded-lg" style={{ background: bg }}>{icon}</div>
                       </div>
-                      <p className={cn('font-black text-slate-900 mb-0.5', small ? 'text-base capitalize truncate' : 'text-3xl')}>{value}</p>
+                      <p className={cn('font-black mb-0.5', small ? 'text-base capitalize truncate' : 'text-2xl')}
+                        style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)', letterSpacing: small ? '0' : '-0.04em' }}>
+                        {value}
+                      </p>
                     </div>
                   ))}
                 </div>
 
-                {/* Missing skills list */}
-                <div className="enterprise-card p-6">
-                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-5">
-                    <Lightbulb size={15} className="text-amber-500" />
+                {/* Missing skills roadmap */}
+                <div className="cn-card p-5">
+                  <h2 className="text-sm font-bold flex items-center gap-2 mb-5" style={{ color: 'var(--color-text-primary)' }}>
+                    <Lightbulb size={14} className="text-amber-500" />
                     Skills to Build — Prioritised by Market Demand
                   </h2>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {skillDevData.missing.map(({ skill, jobsPct, advice }, i) => (
-                      <div key={skill} className={cn('border border-slate-200 rounded-xl p-5 hover:border-indigo-200 hover:shadow-card transition-all duration-200 animate-view-enter', `stagger-${Math.min(i + 1, 6)}`)}>
+                      <div key={skill}
+                        className={cn('rounded-xl p-4 transition-all duration-200 animate-view-enter', `stagger-${Math.min(i + 1, 6)}`)}
+                        style={{ border: '1px solid var(--color-border)' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-border)'; e.currentTarget.style.boxShadow = 'var(--shadow-xs)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.boxShadow = 'none'; }}
+                      >
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div className="flex items-center gap-3">
-                            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white',
+                            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0',
                               i === 0 ? 'bg-red-500' : i === 1 ? 'bg-orange-500' : i <= 4 ? 'bg-amber-500' : 'bg-slate-400')}>
                               #{i + 1}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900 capitalize">{skill}</p>
-                              <p className="text-xs text-slate-400 mt-0.5">{Math.round((jobsPct / 100) * matches.length)} of {matches.length} jobs require this</p>
+                              <p className="font-bold capitalize" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)' }}>{skill}</p>
+                              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+                                {Math.round((jobsPct / 100) * matches.length)} of {matches.length} jobs require this
+                              </p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="text-lg font-black text-indigo-600">{jobsPct}%</p>
-                            <p className="text-[10px] text-slate-400 font-medium">demand</p>
+                            <p className="text-base font-black" style={{ color: 'var(--color-brand)', fontFamily: 'var(--font-heading)' }}>{jobsPct}%</p>
+                            <p className="type-caption">demand</p>
                           </div>
                         </div>
-
                         {/* Demand bar */}
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-                          <div className={cn('h-full rounded-full skill-bar-fill',
-                            jobsPct >= 70 ? 'bg-gradient-to-r from-red-500 to-red-400'
-                            : jobsPct >= 40 ? 'bg-gradient-to-r from-orange-400 to-amber-400'
-                            : 'bg-gradient-to-r from-slate-400 to-slate-300')}
-                            style={{ width: `${jobsPct}%` }} />
+                        <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: 'var(--color-border)' }}>
+                          <div className="h-full rounded-full skill-bar-fill"
+                            style={{
+                              width: `${jobsPct}%`,
+                              background: jobsPct >= 70 ? 'linear-gradient(90deg, #DC2626, #EF4444)'
+                                : jobsPct >= 40 ? 'linear-gradient(90deg, #D97706, #F59E0B)'
+                                : 'linear-gradient(90deg, #9CA3AF, #D1D5DB)',
+                            }}
+                          />
                         </div>
-
-                        {/* Advice */}
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-start gap-2">
-                          <Lightbulb size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-slate-600 leading-relaxed">{advice}</p>
+                        {/* Advice tip */}
+                        <div className="rounded-xl p-3 flex items-start gap-2" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
+                          <Lightbulb size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{advice}</p>
                         </div>
                       </div>
                     ))}
@@ -825,9 +916,10 @@ export default function StudentDashboard() {
 
                 {/* Existing skills */}
                 {profile.parsedSkills.length > 0 && (
-                  <div className="enterprise-card p-5">
-                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
-                      <CheckCircle size={13} className="text-emerald-500" />Your Existing Skills
+                  <div className="cn-card p-5">
+                    <h2 className="type-label flex items-center gap-1.5 mb-4">
+                      <CheckCircle size={12} style={{ color: 'var(--color-success)' }} />
+                      Your Existing Skills
                     </h2>
                     <div className="flex flex-wrap gap-1.5">
                       {profile.parsedSkills.map(skill => (
@@ -845,38 +937,38 @@ export default function StudentDashboard() {
         {activeView === 'documents' && (
           <div className="space-y-5 animate-view-enter">
             <div className="section-header">
-              <h1 className="text-2xl font-black text-slate-900">Documents</h1>
-              <p className="text-slate-500 mt-0.5 text-sm">Manage your resume — the AI parses it on every upload</p>
+              <h1 className="text-2xl font-black" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em' }}>Documents</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>Manage your resume — AI parses it on every upload</p>
             </div>
 
-            {/* Status card */}
+            {/* Resume active status */}
             {profile?.resumeUrl && (
-              <div className="enterprise-card p-5 border-emerald-200 bg-emerald-50 animate-view-enter">
+              <div className="cn-card p-5 animate-view-enter" style={{ borderColor: 'var(--color-success-border)', background: 'var(--color-success-light)' }}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <FileText size={20} className="text-emerald-600" />
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#DCFCE7' }}>
+                      <FileText size={18} style={{ color: 'var(--color-success)' }} />
                     </div>
                     <div>
-                      <p className="font-bold text-emerald-900">Resume Uploaded</p>
-                      <p className="text-sm text-emerald-700 mt-0.5">
-                        {profile.parsedSkills.length} skills parsed successfully
-                      </p>
+                      <p className="font-bold" style={{ color: '#14532D' }}>Resume Uploaded</p>
+                      <p className="text-sm mt-0.5" style={{ color: '#166534' }}>{profile.parsedSkills.length} skills parsed successfully</p>
                     </div>
                   </div>
                   <a href={getViewableResumeUrl(profile.resumeUrl)} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-emerald-200 text-emerald-700
-                               text-xs font-bold rounded-xl hover:bg-emerald-100 transition-colors flex-shrink-0">
-                    <ExternalLink size={13} />View Resume
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition-colors flex-shrink-0"
+                    style={{ background: '#FFFFFF', border: '1px solid var(--color-success-border)', color: 'var(--color-success)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#F0FDF4')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}>
+                    <ExternalLink size={12} />View Resume
                   </a>
                 </div>
               </div>
             )}
 
             {/* Upload dropzone */}
-            <div className="enterprise-card p-6 animate-view-enter stagger-2">
-              <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4">
-                <UploadCloud size={15} className="text-indigo-500" />
+            <div className="cn-card p-5 animate-view-enter stagger-2">
+              <h2 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: 'var(--color-text-primary)' }}>
+                <UploadCloud size={14} style={{ color: 'var(--color-brand)' }} />
                 {profile?.resumeUrl ? 'Replace Resume' : 'Upload Resume'}
               </h2>
               <div
@@ -885,38 +977,41 @@ export default function StudentDashboard() {
                 onDragLeave={() => setDragOver(false)}
                 onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) void handleUpload(f); }}
                 className={cn(
-                  'border-2 border-dashed rounded-2xl p-14 flex flex-col items-center gap-4 cursor-pointer transition-all duration-300',
-                  uploading ? 'border-indigo-300 bg-indigo-50/50 cursor-not-allowed'
-                  : dragOver  ? 'border-indigo-500 bg-indigo-50 scale-[1.01] shadow-lg'
-                  : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-indigo-50/30 hover:scale-[1.005]',
+                  'border-2 border-dashed rounded-2xl p-12 flex flex-col items-center gap-4 cursor-pointer transition-all duration-300',
+                  uploading ? 'cursor-not-allowed' : '',
                 )}
+                style={{
+                  borderColor: uploading ? 'var(--color-brand-border)' : dragOver ? 'var(--color-brand)' : 'var(--color-border)',
+                  background: uploading ? 'var(--color-brand-light)' : dragOver ? '#F5F3FF' : 'var(--color-bg)',
+                  transform: dragOver ? 'scale(1.008)' : 'scale(1)',
+                }}
               >
                 {uploading ? (
                   <>
-                    <Loader2 size={40} className="text-indigo-500 animate-spin" />
+                    <Loader2 size={36} className="animate-spin" style={{ color: 'var(--color-brand)' }} />
                     <div className="text-center">
-                      <p className="text-indigo-700 font-bold text-base">Uploading & Parsing…</p>
-                      <p className="text-indigo-400 text-sm mt-1">AI is extracting your skills</p>
+                      <p className="font-bold" style={{ color: 'var(--color-brand)' }}>Uploading &amp; Parsing…</p>
+                      <p className="text-sm mt-1" style={{ color: 'var(--color-text-tertiary)' }}>AI is extracting your skills</p>
                     </div>
                   </>
                 ) : dragOver ? (
                   <>
-                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center animate-scale-in">
-                      <UploadCloud size={32} className="text-indigo-600" />
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center animate-scale-in" style={{ background: 'var(--color-brand-light)' }}>
+                      <UploadCloud size={28} style={{ color: 'var(--color-brand)' }} />
                     </div>
-                    <p className="text-indigo-700 font-bold text-base">Drop to upload!</p>
+                    <p className="font-bold" style={{ color: 'var(--color-brand)' }}>Drop to upload!</p>
                   </>
                 ) : (
                   <>
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-                      <UploadCloud size={32} className="text-slate-400" />
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'var(--color-border-subtle)' }}>
+                      <UploadCloud size={28} style={{ color: 'var(--color-text-tertiary)' }} />
                     </div>
                     <div className="text-center">
-                      <p className="text-slate-700 font-semibold text-base">Drop your PDF here</p>
-                      <p className="text-slate-500 text-sm mt-1">
-                        or <span className="text-indigo-600 font-bold underline underline-offset-2">click to browse</span>
+                      <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Drop your PDF here</p>
+                      <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                        or <span style={{ color: 'var(--color-brand)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '2px' }}>click to browse</span>
                       </p>
-                      <p className="text-slate-400 text-xs mt-2">PDF only · Max 5 MB · AI skill extraction</p>
+                      <p className="text-xs mt-2" style={{ color: 'var(--color-text-tertiary)' }}>PDF only · Max 5 MB · AI skill extraction</p>
                     </div>
                   </>
                 )}
@@ -925,9 +1020,10 @@ export default function StudentDashboard() {
 
             {/* Parsed skills summary */}
             {profile?.parsedSkills && profile.parsedSkills.length > 0 && (
-              <div className="enterprise-card p-5 animate-view-enter stagger-3">
-                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5">
-                  <Zap size={13} className="text-indigo-400" />AI-Parsed Skills ({profile.parsedSkills.length} found)
+              <div className="cn-card p-5 animate-view-enter stagger-3">
+                <h2 className="type-label flex items-center gap-1.5 mb-4">
+                  <Zap size={11} style={{ color: 'var(--color-brand)' }} />
+                  AI-Parsed Skills ({profile.parsedSkills.length} found)
                 </h2>
                 <div className="flex flex-wrap gap-1.5">
                   {profile.parsedSkills.map(skill => (
@@ -937,13 +1033,13 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            {/* Tip */}
-            <div className="enterprise-card p-4 border-amber-200 bg-amber-50 animate-view-enter stagger-4">
+            {/* Best practices tip */}
+            <div className="cn-card p-4 animate-view-enter stagger-4" style={{ borderColor: 'var(--color-warning-border)', background: 'var(--color-warning-light)' }}>
               <div className="flex items-start gap-3">
-                <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <AlertCircle size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-bold text-amber-900">For best results</p>
-                  <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  <p className="text-xs mt-0.5 leading-relaxed text-amber-700">
                     Use a text-based PDF (not a scanned image). Include a clear skills section listing tools, languages, and frameworks. Avoid tables in skill sections — plain text extracts most accurately.
                   </p>
                 </div>
@@ -956,48 +1052,45 @@ export default function StudentDashboard() {
         {activeView === 'analysis' && (
           <div className="space-y-5 animate-view-enter">
             <div className="section-header">
-              <h1 className="text-2xl font-black text-slate-900">Detailed Candidate Analysis</h1>
-              <p className="text-slate-500 mt-0.5 text-sm">In-depth profile breakdown — your competitive positioning</p>
+              <h1 className="text-2xl font-black" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em' }}>Detailed Analysis</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>In-depth profile breakdown — your competitive positioning</p>
             </div>
 
             {!profile || !analysisData ? (
-              <div className="enterprise-card p-12 text-center">
-                <BarChart2 size={36} className="text-slate-300 mx-auto mb-3" />
-                <p className="font-semibold text-slate-700">Upload resume to unlock analysis</p>
-                <p className="text-slate-400 text-sm mt-1">We need your profile data to generate this report</p>
+              <div className="cn-card p-12 text-center">
+                <BarChart2 size={32} className="mx-auto mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
+                <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Upload resume to unlock analysis</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>We need your profile data to generate this report</p>
                 <button onClick={() => { setActiveView('documents'); fileRef.current?.click(); }} className="btn-primary mt-4">Upload Resume</button>
               </div>
             ) : (
               <>
-                {/* Top hero: score + recommendation */}
+                {/* Analysis hero grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-                  {/* Overall score card */}
-                  <div className="enterprise-card p-6 flex flex-col items-center text-center gap-4 animate-view-enter stagger-1">
-                    <div className="relative">
-                      <CircularProgress score={analysisData.overallScore} size={110} stroke={9} />
-                    </div>
+                  {/* Overall score */}
+                  <div className="cn-card p-5 flex flex-col items-center text-center gap-4 animate-view-enter stagger-1">
+                    <CircularProgress score={analysisData.overallScore} size={100} stroke={8} />
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Overall AI Score</p>
-                      <p className={cn('text-base font-black mt-1',
-                        analysisData.overallScore >= 75 ? 'text-emerald-700'
-                        : analysisData.overallScore >= 55 ? 'text-amber-700' : 'text-red-600')}>
+                      <p className="type-label">Overall AI Score</p>
+                      <p className={cn('text-base font-black mt-1', { 'text-emerald-700': analysisData.overallScore >= 75, 'text-amber-700': analysisData.overallScore >= 55 && analysisData.overallScore < 75, 'text-red-600': analysisData.overallScore < 55 })}>
                         {analysisData.overallScore >= 75 ? 'Excellent' : analysisData.overallScore >= 55 ? 'Good' : analysisData.overallScore >= 35 ? 'Developing' : 'Early Stage'}
                       </p>
                     </div>
-                    <div className="w-full text-left space-y-2 pt-3 border-t border-slate-100">
+                    {/* Score breakdown */}
+                    <div className="w-full text-left space-y-2 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
                       {[
-                        { label: 'Skills Match',  value: analysisData.skillMatchPct },
-                        { label: 'CGPA Score',    value: analysisData.cgpaPct },
-                        { label: 'Experience',    value: analysisData.expPct },
+                        { label: 'Skills Match', value: analysisData.skillMatchPct },
+                        { label: 'CGPA Score',   value: analysisData.cgpaPct },
+                        { label: 'Experience',   value: analysisData.expPct },
                       ].map(({ label, value }) => (
                         <div key={label}>
                           <div className="flex justify-between text-xs mb-0.5">
-                            <span className="text-slate-500 font-medium">{label}</span>
-                            <span className="font-bold text-indigo-600">{value}%</span>
+                            <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
+                            <span className="font-bold" style={{ color: 'var(--color-brand)' }}>{value}%</span>
                           </div>
-                          <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full skill-bar-fill" style={{ width: `${value}%` }} />
+                          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                            <div className="h-full rounded-full skill-bar-fill" style={{ width: `${value}%`, background: 'linear-gradient(90deg, #4F46E5, #7C3AED)' }} />
                           </div>
                         </div>
                       ))}
@@ -1005,32 +1098,32 @@ export default function StudentDashboard() {
                   </div>
 
                   {/* Radar chart */}
-                  <div className="enterprise-card p-6 flex flex-col items-center gap-4 animate-view-enter stagger-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest self-start">Skill Radar</p>
-                    <RadarChart size={190} values={[
-                      { label: 'Skills',      value: analysisData.skillMatchPct },
-                      { label: 'CGPA',        value: analysisData.cgpaPct },
-                      { label: 'Experience',  value: analysisData.expPct },
-                      { label: 'Applications',value: Math.min(100, analysisData.appliedCount * 20) },
+                  <div className="cn-card p-5 flex flex-col items-center gap-4 animate-view-enter stagger-2">
+                    <p className="type-label self-start">Skill Radar</p>
+                    <RadarChart size={180} values={[
+                      { label: 'Skills',       value: analysisData.skillMatchPct },
+                      { label: 'CGPA',         value: analysisData.cgpaPct },
+                      { label: 'Experience',   value: analysisData.expPct },
+                      { label: 'Applications', value: Math.min(100, analysisData.appliedCount * 20) },
                     ]} />
-                    <p className="text-[10px] text-slate-400 text-center leading-relaxed">
-                      Radar shows your strength across 4 dimensions relative to job requirements
+                    <p className="type-caption text-center leading-relaxed">
+                      4-dimension profile radar relative to job requirements
                     </p>
                   </div>
 
-                  {/* Quick stats */}
+                  {/* Quick stat mini-cards */}
                   <div className="flex flex-col gap-3 animate-view-enter stagger-3">
                     {[
-                      { label: 'Top Match Score',   value: `${analysisData.topScore}%`, icon: <Trophy size={16} className="text-indigo-600" />,   bg: 'bg-indigo-50' },
-                      { label: 'Jobs Applied',       value: analysisData.appliedCount,   icon: <CheckCircle size={16} className="text-emerald-600" />, bg: 'bg-emerald-50' },
-                      { label: 'Skills Parsed',      value: profile.parsedSkills.length,  icon: <Zap size={16} className="text-violet-600" />,       bg: 'bg-violet-50' },
-                      { label: 'Skills to Build',    value: skillDevData.missing.length,   icon: <Target size={16} className="text-amber-600" />,      bg: 'bg-amber-50' },
+                      { label: 'Top Match Score', value: `${analysisData.topScore}%`,       icon: <Trophy size={15} style={{ color: 'var(--color-brand)' }} />,    bg: 'var(--color-brand-light)' },
+                      { label: 'Jobs Applied',    value: analysisData.appliedCount,          icon: <CheckCircle size={15} className="text-emerald-600" />,          bg: '#F0FDF4' },
+                      { label: 'Skills Parsed',   value: profile.parsedSkills.length,         icon: <Zap size={15} className="text-violet-600" />,                  bg: '#F5F3FF' },
+                      { label: 'Skills to Build', value: skillDevData.missing.length,         icon: <Target size={15} className="text-amber-600" />,                bg: '#FFFBEB' },
                     ].map(({ label, value, icon, bg }) => (
-                      <div key={label} className="enterprise-card p-4 flex items-center gap-4">
-                        <div className={cn('p-2.5 rounded-xl flex-shrink-0', bg)}>{icon}</div>
+                      <div key={label} className="cn-card p-3.5 flex items-center gap-3.5">
+                        <div className="p-2 rounded-xl flex-shrink-0" style={{ background: bg }}>{icon}</div>
                         <div>
-                          <p className="text-xl font-black text-slate-900">{value}</p>
-                          <p className="text-xs text-slate-400 font-medium">{label}</p>
+                          <p className="text-lg font-black" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)', letterSpacing: '-0.04em' }}>{value}</p>
+                          <p className="type-caption">{label}</p>
                         </div>
                       </div>
                     ))}
@@ -1038,49 +1131,58 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* Recommendation banner */}
-                <div className={cn('enterprise-card p-5 flex items-start gap-4 animate-view-enter stagger-4',
-                  analysisData.overallScore >= 75 ? 'border-emerald-200 bg-emerald-50'
-                  : analysisData.overallScore >= 55 ? 'border-amber-200 bg-amber-50'
-                  : 'border-red-200 bg-red-50')}>
-                  <div className={cn('p-2.5 rounded-xl flex-shrink-0',
-                    analysisData.overallScore >= 75 ? 'bg-emerald-100' : analysisData.overallScore >= 55 ? 'bg-amber-100' : 'bg-red-100')}>
-                    <Star size={18} className={analysisData.overallScore >= 75 ? 'text-emerald-600' : analysisData.overallScore >= 55 ? 'text-amber-600' : 'text-red-500'} />
+                <div
+                  className="cn-card p-5 flex items-start gap-4 animate-view-enter stagger-4"
+                  style={{
+                    borderColor: analysisData.overallScore >= 75 ? 'var(--color-success-border)' : analysisData.overallScore >= 55 ? 'var(--color-warning-border)' : 'var(--color-danger-border)',
+                    background: analysisData.overallScore >= 75 ? 'var(--color-success-light)' : analysisData.overallScore >= 55 ? 'var(--color-warning-light)' : 'var(--color-danger-light)',
+                  }}
+                >
+                  <div className="p-2.5 rounded-xl flex-shrink-0"
+                    style={{ background: analysisData.overallScore >= 75 ? '#DCFCE7' : analysisData.overallScore >= 55 ? '#FEF3C7' : '#FEE2E2' }}>
+                    <Star size={16} className={analysisData.overallScore >= 75 ? 'text-emerald-600' : analysisData.overallScore >= 55 ? 'text-amber-600' : 'text-red-500'} />
                   </div>
                   <div>
-                    <p className="font-bold text-slate-900 text-sm">Overall Recommendation</p>
-                    <p className="text-sm text-slate-700 mt-1 leading-relaxed">{analysisData.recommendation}</p>
+                    <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Overall Recommendation</p>
+                    <p className="text-sm mt-1 leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{analysisData.recommendation}</p>
                   </div>
                 </div>
 
-                {/* Applied jobs timeline */}
+                {/* Application timeline */}
                 {analysisData.appliedJobs.length > 0 && (
-                  <div className="enterprise-card p-6 animate-view-enter stagger-5">
-                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-1.5">
-                      <Clock size={13} className="text-indigo-400" />Application Timeline
+                  <div className="cn-card p-5 animate-view-enter stagger-5">
+                    <h2 className="type-label flex items-center gap-1.5 mb-5">
+                      <Clock size={12} style={{ color: 'var(--color-brand)' }} />
+                      Application Timeline
                     </h2>
                     <div className="relative pl-5">
-                      {/* Vertical line */}
-                      <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-300 to-slate-200 rounded-full" />
-                      <div className="space-y-5">
+                      <div className="absolute left-1.5 top-0 bottom-0 w-0.5 rounded-full"
+                        style={{ background: 'linear-gradient(to bottom, var(--color-brand-border), var(--color-border))' }} />
+                      <div className="space-y-4">
                         {analysisData.appliedJobs.map(({ job, matchScore }, i) => (
                           <div key={job.id} className={cn('relative flex items-start gap-4 animate-view-enter', `stagger-${Math.min(i + 1, 6)}`)}>
-                            {/* Timeline dot */}
-                            <div className="absolute -left-[18px] top-1.5 w-3 h-3 rounded-full bg-indigo-500 border-2 border-white shadow-sm timeline-dot" />
-                            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 hover:border-indigo-200 hover:shadow-card transition-all duration-200">
+                            <div className="absolute -left-[18px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm timeline-dot"
+                              style={{ background: 'var(--color-brand)' }} />
+                            <div className="flex-1 rounded-xl p-4 transition-all duration-200"
+                              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-brand-border)')}
+                              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
                               <div className="flex items-start justify-between gap-3">
                                 <div>
-                                  <p className="font-bold text-slate-900 text-sm">{job.title}</p>
+                                  <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)' }}>{job.title}</p>
                                   {job.recruiter?.recruiterProfile && (
-                                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                    <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
                                       <Building2 size={10} />{job.recruiter.recruiterProfile.companyName}
                                     </p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                    style={{ background: 'var(--color-brand-light)', color: 'var(--color-brand)', border: '1px solid var(--color-brand-border)' }}>
                                     {matchScore}% match
                                   </span>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                    style={{ background: 'var(--color-success-light)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)' }}>
                                     Applied ✓
                                   </span>
                                 </div>
@@ -1094,23 +1196,27 @@ export default function StudentDashboard() {
                 )}
 
                 {/* Skill comparison table */}
-                <div className="enterprise-card p-6 animate-view-enter stagger-6">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-1.5">
-                    <BarChart2 size={13} className="text-indigo-400" />Skills Comparison — Your Profile vs. Job Requirements
+                <div className="cn-card p-5 animate-view-enter stagger-6">
+                  <h2 className="type-label flex items-center gap-1.5 mb-5">
+                    <BarChart2 size={11} style={{ color: 'var(--color-brand)' }} />
+                    Skills Comparison — Your Profile vs. Job Requirements
                   </h2>
                   {matches.slice(0, 3).map(({ job, matchScore }) => {
                     const { matched, missing } = analyzeSkillGap(job.requiredSkills, profile.parsedSkills);
                     return (
-                      <div key={job.id} className="mb-5 last:mb-0 pb-5 last:pb-0 border-b last:border-0 border-slate-100">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="font-bold text-slate-800 text-sm">{job.title}</p>
-                          <span className="text-xs font-bold text-indigo-600">{matchScore}% match</span>
+                      <div key={job.id} className="mb-5 last:mb-0 pb-5 last:pb-0 border-b last:border-0" style={{ borderColor: 'var(--color-border)' }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)' }}>{job.title}</p>
+                          <span className="text-xs font-bold" style={{ color: 'var(--color-brand)' }}>{matchScore}% match</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                          <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full skill-bar-fill"
-                            style={{ width: `${Math.round((matched.length / Math.max(job.requiredSkills.length, 1)) * 100)}%` }} />
+                        <div className="h-2 rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--color-border)' }}>
+                          <div className="h-full rounded-full skill-bar-fill"
+                            style={{ width: `${Math.round((matched.length / Math.max(job.requiredSkills.length, 1)) * 100)}%`, background: 'linear-gradient(90deg, #4F46E5, #7C3AED)' }}
+                          />
                         </div>
-                        <p className="text-xs text-slate-500">{matched.length}/{job.requiredSkills.length} skills matched · {missing.length} to build</p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                          {matched.length}/{job.requiredSkills.length} skills matched · {missing.length} to build
+                        </p>
                       </div>
                     );
                   })}
@@ -1121,7 +1227,7 @@ export default function StudentDashboard() {
         )}
       </main>
 
-      {/* ── Job Details Modal ────────────────────────────────────────────────── */}
+      {/* ── Job Details Modal ─────────────────────────────────────────────────── */}
       {selectedJob && (
         <JobDetailsModal
           match={selectedJob} profile={profile} applying={applying}
@@ -1138,7 +1244,7 @@ export default function StudentDashboard() {
 }
 
 // =============================================================================
-// Shared: JobMatchList
+// JobMatchList — Wellfound-style job card list
 // =============================================================================
 function JobMatchList({
   matches,
@@ -1151,38 +1257,42 @@ function JobMatchList({
   onOpenChat,
   showAll = false,
 }: {
-  matches: MatchedJob[];
-  profile: StudentProfile | null;
-  loadingMatches: boolean;
-  appliedJobs: Set<string>;
-  applying: string | null;
-  onApply: (id: string, title: string) => Promise<void>;
+  matches:       MatchedJob[];
+  profile:       StudentProfile | null;
+  loadingMatches:boolean;
+  appliedJobs:   Set<string>;
+  applying:      string | null;
+  onApply:       (id: string, title: string) => Promise<void>;
   onViewDetails: (m: MatchedJob) => void;
-  onOpenChat?: (conversationId?: string) => void;
-  showAll?: boolean;
+  onOpenChat?:   (conversationId?: string) => void;
+  showAll?:      boolean;
 }) {
+  // Loading skeleton
   if (loadingMatches) return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="border border-slate-200 rounded-xl p-5">
-          <div className="skeleton h-4 w-1/2 mb-3" /><div className="skeleton h-3 w-1/3" />
+        <div key={i} className="rounded-xl p-4" style={{ border: '1px solid var(--color-border)' }}>
+          <div className="skeleton h-3.5 w-1/2 mb-2" /><div className="skeleton h-3 w-1/3" />
         </div>
       ))}
     </div>
   );
 
+  // Empty state
   if (matches.length === 0) return (
-    <div className="text-center py-16">
-      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Briefcase size={28} className="text-slate-400" />
+    <div className="text-center py-14">
+      <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--color-border-subtle)' }}>
+        <Briefcase size={24} style={{ color: 'var(--color-text-tertiary)' }} />
       </div>
-      <p className="font-semibold text-slate-700 text-base">No matches found</p>
-      <p className="text-slate-400 text-sm mt-1">{!profile ? 'Upload your resume to start matching' : 'Try a different filter'}</p>
+      <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>No matches found</p>
+      <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        {!profile ? 'Upload your resume to start matching' : 'Try a different filter'}
+      </p>
     </div>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {(showAll ? matches : matches).map((jobMatch, idx) => {
         const { matchScore, job, applicationStatus, conversationId } = jobMatch;
         const { matched, missing } = analyzeSkillGap(job.requiredSkills, profile?.parsedSkills ?? []);
@@ -1190,70 +1300,91 @@ function JobMatchList({
         const canApply  = matchScore >= 50 && !isApplied;
 
         return (
-          <div key={job.id} className={cn('job-card flex flex-col gap-4 animate-view-enter', idx < 6 && `stagger-${Math.min(idx + 1, 6)}`)}>
+          <div key={job.id}
+            className={cn('job-card flex flex-col gap-3 animate-view-enter', idx < 6 && `stagger-${Math.min(idx + 1, 6)}`)}
+          >
+            {/* Card top row */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              {/* Score */}
+
+              {/* Match score */}
               <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                <CircularProgress score={matchScore} size={72} stroke={7} />
+                <CircularProgress score={matchScore} size={68} stroke={6} />
                 <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-                  matchScore >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : matchScore >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                  : 'bg-red-50 text-red-700 border border-red-200')}>
+                  matchScore >= 80 ? 'badge-match-high' : matchScore >= 50 ? 'badge-match-mid' : 'badge-match-low')}>
                   {matchScore >= 80 ? 'Excellent' : matchScore >= 50 ? 'Good Fit' : 'Low Match'}
                 </span>
               </div>
 
-              {/* Info */}
+              {/* Job info */}
               <div className="flex-1 min-w-0">
-                <h3 className="font-black text-slate-900 text-base leading-snug mb-0.5">{job.title}</h3>
+                <h3 className="font-black text-base leading-snug mb-0.5" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)' }}>
+                  {job.title}
+                </h3>
                 {job.recruiter?.recruiterProfile && (
-                  <p className="text-sm text-slate-500 mb-2 flex items-center gap-1.5">
-                    <Building2 size={12} className="text-slate-400" />
-                    <span className="font-semibold text-slate-700">{job.recruiter.recruiterProfile.companyName}</span>
-                    <span className="text-slate-300">·</span>
+                  <p className="text-sm mb-2 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                    <Building2 size={11} style={{ color: 'var(--color-text-tertiary)' }} />
+                    <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                      {job.recruiter.recruiterProfile.companyName}
+                    </span>
+                    <span style={{ color: 'var(--color-border)' }}>·</span>
                     <span>{job.recruiter.recruiterProfile.designation}</span>
                   </p>
                 )}
                 {job.description && (
-                  <p className="text-xs text-slate-500 leading-relaxed mb-2 line-clamp-2">
+                  <p className="text-xs leading-relaxed mb-2 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
                     {job.description.slice(0, 120)}{job.description.length > 120 ? '…' : ''}
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-xs bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">
-                    Min CGPA: <span className="font-bold text-slate-800">{job.minCgpa}</span>
+                {/* Meta tags */}
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className="text-xs rounded-lg px-2.5 py-1 font-medium"
+                    style={{ background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                    Min CGPA: <span className="font-bold" style={{ color: 'var(--color-text-primary)' }}>{job.minCgpa}</span>
                   </span>
-                  <span className="text-xs bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 font-medium text-slate-600">
-                    Exp: <span className="font-bold text-slate-800">{job.minExperience} yrs</span>
+                  <span className="text-xs rounded-lg px-2.5 py-1 font-medium"
+                    style={{ background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                    Exp: <span className="font-bold" style={{ color: 'var(--color-text-primary)' }}>{job.minExperience} yrs</span>
                   </span>
                   <button onClick={() => onViewDetails(jobMatch)}
-                    className="flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline underline-offset-2 transition-colors">
-                    <BookOpen size={11} />View Full Details
+                    className="flex items-center gap-1 text-xs font-semibold transition-colors"
+                    style={{ color: 'var(--color-brand)' }}
+                    onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+                    <BookOpen size={10} />View Details
                   </button>
                 </div>
               </div>
 
-              {/* Actions: Apply / Chat */}
+              {/* Action buttons */}
               <div className="flex flex-col sm:flex-row items-center gap-2">
+                {/* Shortlisted recruiter chat button */}
                 {isApplied && applicationStatus === 'SHORTLISTED' && onOpenChat && (
                   <button
                     type="button"
                     onClick={() => onOpenChat(conversationId ?? undefined)}
-                    className="flex-shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-600/30 transition-all duration-150 animate-pulse"
+                    className="flex-shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition-all duration-150"
+                    style={{ background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', boxShadow: '0 4px 12px rgba(79,70,229,0.35)' }}
                     title="Live 1-on-1 Chat with Recruiter"
                   >
-                    <MessageSquare size={13} />
+                    <MessageSquare size={12} />
                     Chat with Recruiter
                   </button>
                 )}
-                <button onClick={() => void onApply(job.id, job.title)}
+                {/* Apply / status button */}
+                <button
+                  onClick={() => void onApply(job.id, job.title)}
                   disabled={applying === job.id || !canApply}
-                  className={cn('flex-shrink-0 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-150 w-full sm:w-auto',
-                    isApplied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-                    : canApply ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-[0.97]'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200',
-                    applying === job.id && 'opacity-70')}>
-                  {applying === job.id ? <Loader2 size={14} className="animate-spin" /> : isApplied ? <CheckCircle size={14} /> : <ChevronRight size={14} />}
+                  className={cn('flex-shrink-0 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-150 w-full sm:w-auto')}
+                  style={isApplied
+                    ? { background: 'var(--color-success-light)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)', cursor: 'not-allowed' }
+                    : canApply
+                    ? { background: 'var(--color-brand)', color: '#FFFFFF' }
+                    : { background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border)', cursor: 'not-allowed' }
+                  }
+                  onMouseEnter={e => { if (canApply && !isApplied) e.currentTarget.style.background = 'var(--color-brand-hover)'; }}
+                  onMouseLeave={e => { if (canApply && !isApplied) e.currentTarget.style.background = 'var(--color-brand)'; }}
+                >
+                  {applying === job.id ? <Loader2 size={13} className="animate-spin" /> : isApplied ? <CheckCircle size={13} /> : <ChevronRight size={13} />}
                   {isApplied
                     ? (applicationStatus === 'SHORTLISTED' ? 'Shortlisted 🎉' : applicationStatus === 'REJECTED' ? 'Reviewed' : 'Applied')
                     : matchScore >= 50 ? 'Apply Now' : 'Below Threshold'}
@@ -1261,41 +1392,47 @@ function JobMatchList({
               </div>
             </div>
 
-            {/* Skill gap */}
-            <div className="pt-3 border-t border-slate-100">
+            {/* Skill gap section */}
+            <div className="pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {matched.map(s => <span key={s} className="skill-matched">✓ {s}</span>)}
                 {missing.map(s  => <span key={s} className="skill-missing">✗ {s}</span>)}
               </div>
+              {/* Skill gap contextual advice */}
               {missing.length === 0 && matched.length > 0 ? (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center gap-2">
-                  <CheckCircle size={13} className="text-emerald-600 flex-shrink-0" />
-                  <p className="text-xs font-bold text-emerald-800">Perfect Match — all {matched.length} skills covered!</p>
+                <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: 'var(--color-success-light)', border: '1px solid var(--color-success-border)' }}>
+                  <CheckCircle size={12} style={{ color: 'var(--color-success)', flexShrink: 0 }} />
+                  <p className="text-xs font-bold" style={{ color: 'var(--color-success)' }}>
+                    Perfect Match — all {matched.length} skills covered!
+                  </p>
                 </div>
               ) : missing.length > 0 ? (
-                <div className={cn('rounded-xl p-4 space-y-2 border',
-                  missing.length <= 2 ? 'bg-amber-50 border-amber-100' : missing.length <= 5 ? 'bg-orange-50 border-orange-100' : 'bg-red-50 border-red-100')}>
+                <div className={cn('rounded-xl p-3.5 space-y-2 border')}
+                  style={{
+                    background: missing.length <= 2 ? 'var(--color-warning-light)' : missing.length <= 5 ? '#FFF7ED' : 'var(--color-danger-light)',
+                    borderColor: missing.length <= 2 ? 'var(--color-warning-border)' : missing.length <= 5 ? '#FED7AA' : 'var(--color-danger-border)',
+                  }}>
                   <div className="flex items-center gap-2">
-                    <Info size={13} className={missing.length <= 2 ? 'text-amber-600' : missing.length <= 5 ? 'text-orange-600' : 'text-red-500'} />
-                    <p className={cn('text-xs font-bold uppercase tracking-wide', missing.length <= 2 ? 'text-amber-800' : missing.length <= 5 ? 'text-orange-800' : 'text-red-800')}>
+                    <Info size={12} style={{ color: missing.length <= 2 ? '#D97706' : missing.length <= 5 ? '#EA580C' : '#DC2626' }} />
+                    <p className="text-xs font-bold uppercase tracking-wide"
+                      style={{ color: missing.length <= 2 ? '#92400E' : missing.length <= 5 ? '#7C2D12' : '#7F1D1D' }}>
                       {matched.length}/{matched.length + missing.length} matched · {missing.length} to build
                     </p>
                   </div>
-                  <div className="space-y-1.5">
-                    {missing.slice(0, 3).map(skill => (
-                      <div key={skill} className="flex items-start gap-2 bg-white/70 rounded-lg p-2">
-                        <span className={cn('w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0', missing.length <= 2 ? 'bg-amber-400' : missing.length <= 5 ? 'bg-orange-400' : 'bg-red-400')} />
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold text-slate-800 capitalize">{skill}</span>
-                          <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                            {SKILL_ADVICE[skill.toLowerCase()] ?? `Build a project demonstrating ${skill}.`}
-                          </p>
-                        </div>
+                  {missing.slice(0, 3).map(skill => (
+                    <div key={skill} className="flex items-start gap-2 bg-white/70 rounded-lg p-2">
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                        style={{ background: missing.length <= 2 ? '#F59E0B' : missing.length <= 5 ? '#F97316' : '#EF4444' }} />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold capitalize" style={{ color: 'var(--color-text-primary)' }}>{skill}</span>
+                        <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                          {SKILL_ADVICE[skill.toLowerCase()] ?? `Build a project demonstrating ${skill}.`}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                   {missing.length > 3 && (
-                    <p className={cn('text-xs font-medium pl-3', missing.length <= 5 ? 'text-orange-700' : 'text-red-700')}>
+                    <p className="text-xs font-medium pl-3" style={{ color: missing.length <= 5 ? '#92400E' : '#7F1D1D' }}>
                       +{missing.length - 3} more — focus on above first.
                     </p>
                   )}
@@ -1310,7 +1447,7 @@ function JobMatchList({
 }
 
 // =============================================================================
-// JobDetailsModal (preserved exactly)
+// JobDetailsModal — full-screen slide-up sheet
 // =============================================================================
 function JobDetailsModal({
   match,
@@ -1321,12 +1458,12 @@ function JobDetailsModal({
   onClose,
   onOpenChat,
 }: {
-  match: MatchedJob;
-  profile: StudentProfile | null;
-  applying: string | null;
+  match:       MatchedJob;
+  profile:     StudentProfile | null;
+  applying:    string | null;
   appliedJobs: Set<string>;
-  onApply: (id: string, title: string) => Promise<void>;
-  onClose: () => void;
+  onApply:     (id: string, title: string) => Promise<void>;
+  onClose:     () => void;
   onOpenChat?: (conversationId?: string) => void;
 }) {
   const { matchScore, job, applicationStatus, conversationId } = match;
@@ -1336,75 +1473,176 @@ function JobDetailsModal({
   const designation = job.recruiter?.recruiterProfile?.designation;
   const { matched, missing } = analyzeSkillGap(job.requiredSkills, profile?.parsedSkills ?? []);
 
+  // Keyboard + body scroll handlers
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, [onClose]);
-  useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
 
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="relative bg-white w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col animate-slide-up overflow-hidden">
-        <div className="flex items-start justify-between gap-4 p-6 border-b border-slate-200 flex-shrink-0">
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+    >
+      <div className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[86vh] rounded-t-2xl sm:rounded-2xl flex flex-col animate-slide-up overflow-hidden"
+        style={{ background: '#FFFFFF', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 p-5 border-b flex-shrink-0" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-black text-slate-900">{job.title}</h2>
-            {company && <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5"><Building2 size={13} className="text-slate-400" /><span className="font-semibold text-slate-700">{company}</span>{designation && <><span className="text-slate-300">·</span><span>{designation}</span></>}</p>}
+            <h2 className="text-xl font-black" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.025em' }}>
+              {job.title}
+            </h2>
+            {company && (
+              <p className="text-sm mt-1 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                <Building2 size={12} style={{ color: 'var(--color-text-tertiary)' }} />
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>{company}</span>
+                {designation && <><span style={{ color: 'var(--color-border)' }}>·</span><span>{designation}</span></>}
+              </p>
+            )}
           </div>
           <div className="flex flex-col items-center gap-1 flex-shrink-0">
-            <CircularProgress score={matchScore} size={60} stroke={6} />
-            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', matchScore >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : matchScore >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-red-50 text-red-700 border border-red-200')}>
+            <CircularProgress score={matchScore} size={56} stroke={5} />
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', matchScore >= 80 ? 'badge-match-high' : matchScore >= 50 ? 'badge-match-mid' : 'badge-match-low')}>
               {matchScore >= 80 ? 'Excellent' : matchScore >= 50 ? 'Good Fit' : 'Low Match'}
             </span>
           </div>
-          <button onClick={onClose} className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"><X size={18} /></button>
+          <button onClick={onClose} className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--color-text-tertiary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-border-subtle)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <X size={17} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Job meta tags */}
           <div className="flex flex-wrap gap-2">
-            <span className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700"><Award size={12} className="text-indigo-500" />Min CGPA: <span className="text-indigo-700 font-black ml-0.5">{job.minCgpa}</span></span>
-            <span className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700"><Briefcase size={12} className="text-indigo-500" />Min Experience: <span className="text-indigo-700 font-black ml-0.5">{job.minExperience} yrs</span></span>
+            <span className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+              style={{ background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <Award size={11} style={{ color: 'var(--color-brand)' }} />Min CGPA: <span style={{ color: 'var(--color-brand)', fontWeight: 700 }}>{job.minCgpa}</span>
+            </span>
+            <span className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+              style={{ background: 'var(--color-border-subtle)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <Briefcase size={11} style={{ color: 'var(--color-brand)' }} />Min Experience: <span style={{ color: 'var(--color-brand)', fontWeight: 700 }}>{job.minExperience} yrs</span>
+            </span>
           </div>
-          <div><h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><FileText size={12} className="text-indigo-400" />Job Description</h3><p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{job.description}</p></div>
+
+          {/* Description */}
           <div>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5"><Zap size={12} className="text-indigo-400" />Required Skills<span className="ml-auto text-[10px] font-bold text-slate-400 normal-case">{matched.length}/{job.requiredSkills.length} matched</span></h3>
+            <h3 className="type-label flex items-center gap-1.5 mb-3">
+              <FileText size={11} style={{ color: 'var(--color-brand)' }} />Job Description
+            </h3>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-text-secondary)' }}>{job.description}</p>
+          </div>
+
+          {/* Required skills */}
+          <div>
+            <h3 className="type-label flex items-center gap-1.5 mb-3">
+              <Zap size={11} style={{ color: 'var(--color-brand)' }} />Required Skills
+              <span className="ml-auto normal-case font-normal" style={{ color: 'var(--color-text-tertiary)' }}>
+                {matched.length}/{job.requiredSkills.length} matched
+              </span>
+            </h3>
             <div className="flex flex-wrap gap-1.5">
               {job.requiredSkills.map(skill => {
                 const isMat = matched.map(s => s.toLowerCase()).includes(skill.toLowerCase());
-                return <span key={skill} className={cn('px-2.5 py-1 rounded-md text-xs font-semibold border', isMat ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200')}>{isMat ? '✓' : '✗'} {skill}</span>;
+                return (
+                  <span key={skill} className="px-2.5 py-1 rounded-md text-xs font-semibold border"
+                    style={isMat
+                      ? { background: 'var(--color-success-light)', color: 'var(--color-success)', borderColor: 'var(--color-success-border)' }
+                      : { background: 'var(--color-danger-light)', color: 'var(--color-danger)', borderColor: 'var(--color-danger-border)' }
+                    }>
+                    {isMat ? '✓' : '✗'} {skill}
+                  </span>
+                );
               })}
             </div>
           </div>
+
+          {/* Missing skills advice */}
           {missing.length > 0 && (
-            <div className={cn('rounded-xl p-4 space-y-3 border', missing.length <= 2 ? 'bg-amber-50 border-amber-100' : missing.length <= 5 ? 'bg-orange-50 border-orange-100' : 'bg-red-50 border-red-100')}>
-              <div className="flex items-center gap-2"><Info size={14} className={missing.length <= 2 ? 'text-amber-600' : missing.length <= 5 ? 'text-orange-600' : 'text-red-500'} /><p className={cn('text-xs font-bold uppercase tracking-wide', missing.length <= 2 ? 'text-amber-800' : missing.length <= 5 ? 'text-orange-800' : 'text-red-800')}>{missing.length} skill{missing.length !== 1 ? 's' : ''} to build</p></div>
-              <div className="space-y-2">{missing.map(skill => <div key={skill} className="flex items-start gap-2.5 bg-white/70 rounded-lg p-2.5"><span className={cn('w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0', missing.length <= 2 ? 'bg-amber-400' : missing.length <= 5 ? 'bg-orange-400' : 'bg-red-400')} /><div><span className="text-xs font-bold text-slate-800 capitalize">{skill}</span><p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{SKILL_ADVICE[skill.toLowerCase()] ?? `Build a hands-on project demonstrating ${skill}.`}</p></div></div>)}</div>
+            <div className="rounded-xl p-4 space-y-3 border"
+              style={{
+                background: missing.length <= 2 ? 'var(--color-warning-light)' : 'var(--color-danger-light)',
+                borderColor: missing.length <= 2 ? 'var(--color-warning-border)' : 'var(--color-danger-border)',
+              }}>
+              <div className="flex items-center gap-2">
+                <Info size={13} style={{ color: missing.length <= 2 ? '#D97706' : '#DC2626' }} />
+                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: missing.length <= 2 ? '#92400E' : '#7F1D1D' }}>
+                  {missing.length} skill{missing.length !== 1 ? 's' : ''} to build
+                </p>
+              </div>
+              <div className="space-y-2">
+                {missing.map(skill => (
+                  <div key={skill} className="flex items-start gap-2.5 bg-white/70 rounded-lg p-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ background: missing.length <= 2 ? '#F59E0B' : '#EF4444' }} />
+                    <div>
+                      <span className="text-xs font-bold capitalize" style={{ color: 'var(--color-text-primary)' }}>{skill}</span>
+                      <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                        {SKILL_ADVICE[skill.toLowerCase()] ?? `Build a hands-on project demonstrating ${skill}.`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Perfect match banner */}
           {matched.length === job.requiredSkills.length && job.requiredSkills.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5"><CheckCircle size={15} className="text-emerald-600 mt-0.5 flex-shrink-0" /><div><p className="text-sm font-bold text-emerald-800">Perfect Skill Match! 🎉</p><p className="text-xs text-emerald-700 mt-0.5">Your resume covers every required skill.</p></div></div>
+            <div className="rounded-xl p-3 flex items-start gap-2.5"
+              style={{ background: 'var(--color-success-light)', border: '1px solid var(--color-success-border)' }}>
+              <CheckCircle size={14} style={{ color: 'var(--color-success)', marginTop: '2px', flexShrink: 0 }} />
+              <div>
+                <p className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>Perfect Skill Match! 🎉</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-success)' }}>Your resume covers every required skill.</p>
+              </div>
+            </div>
           )}
         </div>
-        <div className="flex-shrink-0 border-t border-slate-200 p-5 bg-white flex items-center gap-3">
+
+        {/* Footer actions */}
+        <div className="flex-shrink-0 border-t p-4 flex items-center gap-3" style={{ borderColor: 'var(--color-border)', background: '#FFFFFF' }}>
           {isApplied && applicationStatus === 'SHORTLISTED' && onOpenChat && (
-            <button
-              type="button"
+            <button type="button"
               onClick={() => onOpenChat(conversationId ?? undefined)}
-              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-600/30 transition-all duration-150 animate-pulse"
-            >
-              <MessageSquare size={15} />
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all duration-150"
+              style={{ background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', boxShadow: '0 4px 12px rgba(79,70,229,0.35)' }}>
+              <MessageSquare size={14} />
               Chat with Recruiter
             </button>
           )}
-          <button onClick={() => void onApply(job.id, job.title)} disabled={applying === job.id || !canApply}
-            className={cn('flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-150',
-              isApplied ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-              : canApply ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-[0.97]'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200',
-              applying === job.id && 'opacity-70 cursor-not-allowed')}>
-            {applying === job.id ? <Loader2 size={16} className="animate-spin" /> : isApplied ? <CheckCircle size={16} /> : <ChevronRight size={16} />}
+          <button
+            onClick={() => void onApply(job.id, job.title)}
+            disabled={applying === job.id || !canApply}
+            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-150"
+            style={isApplied
+              ? { background: 'var(--color-success-light)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)', cursor: 'not-allowed' }
+              : canApply
+              ? { background: 'var(--color-brand)', color: '#FFFFFF' }
+              : { background: 'var(--color-border-subtle)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border)', cursor: 'not-allowed' }
+            }
+            onMouseEnter={e => { if (canApply && !isApplied) e.currentTarget.style.background = 'var(--color-brand-hover)'; }}
+            onMouseLeave={e => { if (canApply && !isApplied) e.currentTarget.style.background = 'var(--color-brand)'; }}
+          >
+            {applying === job.id ? <Loader2 size={15} className="animate-spin" /> : isApplied ? <CheckCircle size={15} /> : <ChevronRight size={15} />}
             {isApplied ? 'Already Applied' : matchScore >= 50 ? 'Apply Now' : 'Score Below Threshold (50%)'}
           </button>
-          <button onClick={onClose} className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 text-sm font-semibold transition-colors">Close</button>
+          <button onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', background: '#FFFFFF' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg)')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}>
+            Close
+          </button>
         </div>
       </div>
     </div>
