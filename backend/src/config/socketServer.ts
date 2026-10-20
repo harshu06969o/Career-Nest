@@ -200,20 +200,6 @@ export function getIO(): SocketIOServer {
 }
 
 /**
- * Gracefully terminates the Socket.io server, disconnecting active clients
- * and clearing presence tracking state.
- */
-export async function closeSocketServer(): Promise<void> {
-  if (!io) return;
-  const currentIO = io;
-  io = null;
-  userSockets.clear();
-  await new Promise<void>((resolve) => {
-    currentIO.close(() => resolve());
-  });
-}
-
-/**
  * Dispatches an event directly to every active socket belonging to a target user.
  * If the user has multiple tabs/devices open, all connections receive the event.
  *
